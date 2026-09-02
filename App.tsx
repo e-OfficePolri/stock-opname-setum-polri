@@ -397,15 +397,18 @@ const ManajemenBarangScreen = () => {
   );
 };
 
-// --- 3. LAYAR BARANG MASUK ---
+// --- 3. LAYAR BARANG MASUK (DENGAN KERANJANG) ---
 const BarangMasukScreen = () => {
   const [noDokumen, setNoDokumen] = useState('');
   const [tanggalInput, setTanggalInput] = useState(getTanggalHariIni());
+  
   const [namaBarang, setNamaBarang] = useState('');
   const [kodeTerpilih, setKodeTerpilih] = useState('');
   const [jumlah, setJumlah] = useState('');
-  // Menambahkan state baru untuk keterangan
-  const [keterangan, setKeterangan] = useState('');
+  const [keteranganItem, setKeteranganItem] = useState('');
+  
+  // Keranjang untuk menampung beberapa barang sebelum disimpan sekaligus
+  const [keranjang, setKeranjang] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
   const [listMaster, setListMaster] = useState<any[]>([]);
@@ -460,35 +463,67 @@ const BarangMasukScreen = () => {
     item.kode.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const handleSimpanKeFirebase = async () => {
-    if (noDokumen.trim() === '' || tanggalInput.trim() === '' || namaBarang.trim() === '' || jumlah.trim() === '') {
-      Alert.alert('Peringatan', 'Semua kolom bertanda wajib harus diisi!');
+  // Menambahkan barang ke keranjang sementara
+  const handleTambahKeKeranjang = () => {
+    if (!namaBarang || !jumlah || Number(jumlah) <= 0) {
+      Alert.alert('Peringatan', 'Pilih nama barang dan masukkan jumlah dengan benar!');
+      return;
+    }
+
+    const newItem = {
+      id: Date.now().toString(),
+      kodeBarang: kodeTerpilih,
+      namaBarang: namaBarang,
+      jumlah: Number(jumlah),
+      keterangan: keteranganItem.trim(),
+    };
+
+    setKeranjang([...keranjang, newItem]);
+    // Reset form input barang saja, nomor dokumen & tanggal tetap
+    setNamaBarang('');
+    setKodeTerpilih('');
+    setJumlah('');
+    setKeteranganItem('');
+  };
+
+  // Menghapus item dari keranjang
+  const handleHapusDariKeranjang = (id: string) => {
+    setKeranjang(keranjang.filter(item => item.id !== id));
+  };
+
+  // Menyimpan semua isi keranjang ke Firebase dengan No Dokumen yang sama
+  const handleSimpanSemuaKeFirebase = async () => {
+    if (!noDokumen.trim() || !tanggalInput.trim()) {
+      Alert.alert('Peringatan', 'No. Dokumen dan Tanggal wajib diisi!');
+      return;
+    }
+
+    if (keranjang.length === 0) {
+      Alert.alert('Peringatan', 'Keranjang masih kosong. Tambahkan minimal satu barang!');
       return;
     }
 
     try {
       setLoading(true);
-      
-      // Memasukkan keterangan ke dalam database
-      await addDoc(collection(db, 'barangMasuk'), {
-        noDokumen: noDokumen.trim(),
-        tanggal: tanggalInput.trim(),
-        kodeBarang: kodeTerpilih,
-        namaBarang: namaBarang,
-        jumlah: Number(jumlah),
-        keterangan: keterangan.trim(), // Data keterangan disimpan di sini
-        createdAt: new Date().toISOString(),
-      });
 
-      Alert.alert('Sukses', `Barang ${namaBarang} dengan No. Dokumen ${noDokumen} berhasil disimpan!`);
+      for (let item of keranjang) {
+        await addDoc(collection(db, 'barangMasuk'), {
+          noDokumen: noDokumen.trim(),
+          tanggal: tanggalInput.trim(),
+          kodeBarang: item.kodeBarang,
+          namaBarang: item.namaBarang,
+          jumlah: item.jumlah,
+          keterangan: item.keterangan,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      Alert.alert('Sukses', `Semua barang dalam No. Dokumen ${noDokumen} berhasil disimpan!`);
       
-      // Mereset form kembali kosong
+      // Reset total form
       setNoDokumen('');
       setTanggalInput(getTanggalHariIni());
-      setJumlah('');
-      setKeterangan(''); // Reset keterangan juga
-      setNamaBarang('');
-      setKodeTerpilih('');
+      setKeranjang([]);
     } catch (error: any) {
       console.error("Gagal menyimpan data detail: ", error);
       Alert.alert('Error', `Gagal menyimpan: ${error.message}`);
@@ -517,53 +552,87 @@ const BarangMasukScreen = () => {
         onChangeText={setTanggalInput}
       />
 
-      <Text style={styles.label}>Kode Barang:</Text>
-      <TextInput 
-        style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
-        value={kodeTerpilih}
-        editable={false}
-        placeholder="Pilih barang terlebih dahulu..."
-      />
+      <View style={{ backgroundColor: '#FFF', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0' }}>
+        <Text style={[styles.label, { color: '#0056b3' }]}>Form Tambah Item Barang</Text>
 
-      <Text style={styles.label}>Pilih Nama Barang:</Text>
-      <TouchableOpacity 
-        style={styles.dropdownSelector}
-        onPress={() => setModalSearchVisible(true)}
-        disabled={masterLoading || listMaster.length === 0}
-      >
-        <Text style={{ fontSize: 16, color: namaBarang ? '#333' : '#888' }}>
-          {masterLoading ? 'Memuat daftar barang...' : 
-           listMaster.length === 0 ? 'Master barang kosong. Tambah dulu!' : 
-           namaBarang ? namaBarang : 'Ketuk untuk mencari barang...'}
+        <Text style={styles.label}>Kode Barang:</Text>
+        <TextInput 
+          style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
+          value={kodeTerpilih}
+          editable={false}
+          placeholder="Pilih barang terlebih dahulu..."
+        />
+
+        <Text style={styles.label}>Pilih Nama Barang:</Text>
+        <TouchableOpacity 
+          style={styles.dropdownSelector}
+          onPress={() => setModalSearchVisible(true)}
+          disabled={masterLoading || listMaster.length === 0}
+        >
+          <Text style={{ fontSize: 16, color: namaBarang ? '#333' : '#888' }}>
+            {masterLoading ? 'Memuat daftar barang...' : 
+             listMaster.length === 0 ? 'Master barang kosong. Tambah dulu!' : 
+             namaBarang ? namaBarang : 'Ketuk untuk mencari barang...'}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="#666" />
+        </TouchableOpacity>
+
+        <Text style={styles.label}>Jumlah Masuk:</Text>
+        <TextInput 
+          style={styles.input}
+          placeholder="Contoh: 10"
+          keyboardType="numeric"
+          value={jumlah}
+          onChangeText={setJumlah}
+        />
+
+        <Text style={styles.label}>Keterangan (Opsional):</Text>
+        <TextInput 
+          style={styles.input}
+          placeholder="Contoh: Kondisi baik..."
+          value={keteranganItem}
+          onChangeText={setKeteranganItem}
+        />
+
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: '#28a745', marginTop: 5 }]} 
+          onPress={handleTambahKeKeranjang}
+        >
+          <Text style={styles.buttonText}>+ Masukkan ke Daftar</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Daftar Item di Keranjang */}
+      <Text style={styles.label}>Daftar Barang Masuk ({keranjang.length}):</Text>
+      {keranjang.length === 0 ? (
+        <Text style={[styles.subtitle, { marginBottom: 15, textAlign: 'left', fontStyle: 'italic' }]}>
+          Belum ada item ditambahkan ke daftar ini.
         </Text>
-        <Ionicons name="chevron-down" size={20} color="#666" />
-      </TouchableOpacity>
-
-      <Text style={styles.label}>Jumlah Masuk:</Text>
-      <TextInput 
-        style={styles.input}
-        placeholder="Contoh: 10"
-        keyboardType="numeric"
-        value={jumlah}
-        onChangeText={setJumlah}
-      />
-
-      {/* Menambahkan Kolom UI Keterangan di Sini */}
-      <Text style={styles.label}>Keterangan (Opsional):</Text>
-      <TextInput 
-        style={styles.input}
-        placeholder="Contoh: Dari vendor / kondisi baik..."
-        value={keterangan}
-        onChangeText={setKeterangan}
-      />
+      ) : (
+        keranjang.map((item) => (
+          <View key={item.id} style={[styles.logCard, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.logItemName}>[{item.kodeBarang}] {item.namaBarang}</Text>
+              <Text style={styles.logDetail}>Jumlah: {item.jumlah} Unit</Text>
+              {item.keterangan ? <Text style={styles.logDetail}>Ket: {item.keterangan}</Text> : null}
+            </View>
+            <TouchableOpacity 
+              style={[styles.iconButton, { backgroundColor: '#d9534f' }]} 
+              onPress={() => handleHapusDariKeranjang(item.id)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
 
       <TouchableOpacity 
-        style={[styles.button, { marginBottom: 30 }, loading && { backgroundColor: '#cccccc' }]} 
-        onPress={handleSimpanKeFirebase}
-        disabled={loading || !namaBarang}
+        style={[styles.button, { marginBottom: 30, marginTop: 15 }, loading && { backgroundColor: '#cccccc' }]} 
+        onPress={handleSimpanSemuaKeFirebase}
+        disabled={loading || keranjang.length === 0}
       >
         <Text style={styles.buttonText}>
-          {loading ? 'Menyimpan...' : 'Simpan ke Database'}
+          {loading ? 'Menyimpan...' : 'Simpan Semua ke Database'}
         </Text>
       </TouchableOpacity>
 
@@ -612,14 +681,18 @@ const BarangMasukScreen = () => {
   );
 };
 
-// --- 4. LAYAR BARANG KELUAR ---
+// --- 4. LAYAR BARANG KELUAR (DENGAN KERANJANG) ---
 const BarangKeluarScreen = () => {
   const [noDokumen, setNoDokumen] = useState('');
   const [tanggalInput, setTanggalInput] = useState(getTanggalHariIni());
+  
   const [namaBarang, setNamaBarang] = useState('');
   const [kodeTerpilih, setKodeTerpilih] = useState('');
   const [jumlah, setJumlah] = useState('');
   const [keterangan, setKeterangan] = useState('');
+  
+  // Keranjang untuk barang keluar
+  const [keranjang, setKeranjang] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
   const [listMaster, setListMaster] = useState<any[]>([]);
@@ -674,33 +747,62 @@ const BarangKeluarScreen = () => {
     item.kode.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const handleSimpanKeluarKeFirebase = async () => {
-    if (noDokumen.trim() === '' || tanggalInput.trim() === '' || namaBarang.trim() === '' || jumlah.trim() === '') {
-      Alert.alert('Peringatan', 'No. Dokumen, Tanggal, Nama Barang, dan Jumlah wajib diisi!');
+  const handleTambahKeKeranjang = () => {
+    if (!namaBarang || !jumlah || Number(jumlah) <= 0) {
+      Alert.alert('Peringatan', 'Pilih nama barang dan masukkan jumlah keluar!');
+      return;
+    }
+
+    const newItem = {
+      id: Date.now().toString(),
+      kodeBarang: kodeTerpilih,
+      namaBarang: namaBarang,
+      jumlah: Number(jumlah),
+      keterangan: keterangan.trim(),
+    };
+
+    setKeranjang([...keranjang, newItem]);
+    setNamaBarang('');
+    setKodeTerpilih('');
+    setJumlah('');
+    setKeterangan('');
+  };
+
+  const handleHapusDariKeranjang = (id: string) => {
+    setKeranjang(keranjang.filter(item => item.id !== id));
+  };
+
+  const handleSimpanKeluarSemuaKeFirebase = async () => {
+    if (!noDokumen.trim() || !tanggalInput.trim()) {
+      Alert.alert('Peringatan', 'No. Dokumen dan Tanggal wajib diisi!');
+      return;
+    }
+
+    if (keranjang.length === 0) {
+      Alert.alert('Peringatan', 'Keranjang masih kosong. Tambahkan minimal satu barang!');
       return;
     }
 
     try {
       setLoading(true);
       
-      await addDoc(collection(db, 'barangKeluar'), {
-        noDokumen: noDokumen.trim(),
-        tanggal: tanggalInput.trim(),
-        kodeBarang: kodeTerpilih,
-        namaBarang: namaBarang,
-        jumlah: Number(jumlah),
-        keterangan: keterangan,
-        createdAt: new Date().toISOString(),
-      });
+      for (let item of keranjang) {
+        await addDoc(collection(db, 'barangKeluar'), {
+          noDokumen: noDokumen.trim(),
+          tanggal: tanggalInput.trim(),
+          kodeBarang: item.kodeBarang,
+          namaBarang: item.namaBarang,
+          jumlah: item.jumlah,
+          keterangan: item.keterangan,
+          createdAt: new Date().toISOString(),
+        });
+      }
 
-      Alert.alert('Sukses', `Barang Keluar: ${namaBarang} sejumlah ${jumlah} berhasil dicatat!`);
+      Alert.alert('Sukses', `Semua barang keluar dengan No. Dokumen ${noDokumen} berhasil dicatat!`);
       
       setNoDokumen('');
       setTanggalInput(getTanggalHariIni());
-      setJumlah('');
-      setKeterangan('');
-      setNamaBarang('');
-      setKodeTerpilih('');
+      setKeranjang([]);
     } catch (error: any) {
       console.error("Gagal menyimpan data barang keluar: ", error);
       Alert.alert('Error', `Gagal menyimpan: ${error.message}`);
@@ -729,52 +831,86 @@ const BarangKeluarScreen = () => {
         onChangeText={setTanggalInput}
       />
 
-      <Text style={styles.label}>Kode Barang:</Text>
-      <TextInput 
-        style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
-        value={kodeTerpilih}
-        editable={false}
-        placeholder="Pilih barang terlebih dahulu..."
-      />
+      <View style={{ backgroundColor: '#FFF', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0' }}>
+        <Text style={[styles.label, { color: '#d9534f' }]}>Form Tambah Item Barang Keluar</Text>
 
-      <Text style={styles.label}>Pilih Nama Barang:</Text>
-      <TouchableOpacity 
-        style={styles.dropdownSelector}
-        onPress={() => setModalSearchVisible(true)}
-        disabled={masterLoading || listMaster.length === 0}
-      >
-        <Text style={{ fontSize: 16, color: namaBarang ? '#333' : '#888' }}>
-          {masterLoading ? 'Memuat daftar barang...' : 
-           listMaster.length === 0 ? 'Master barang kosong. Tambah dulu!' : 
-           namaBarang ? namaBarang : 'Ketuk untuk mencari barang...'}
+        <Text style={styles.label}>Kode Barang:</Text>
+        <TextInput 
+          style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
+          value={kodeTerpilih}
+          editable={false}
+          placeholder="Pilih barang terlebih dahulu..."
+        />
+
+        <Text style={styles.label}>Pilih Nama Barang:</Text>
+        <TouchableOpacity 
+          style={styles.dropdownSelector}
+          onPress={() => setModalSearchVisible(true)}
+          disabled={masterLoading || listMaster.length === 0}
+        >
+          <Text style={{ fontSize: 16, color: namaBarang ? '#333' : '#888' }}>
+            {masterLoading ? 'Memuat daftar barang...' : 
+             listMaster.length === 0 ? 'Master barang kosong. Tambah dulu!' : 
+             namaBarang ? namaBarang : 'Ketuk untuk mencari barang...'}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="#666" />
+        </TouchableOpacity>
+
+        <Text style={styles.label}>Jumlah Keluar:</Text>
+        <TextInput 
+          style={styles.input}
+          placeholder="Contoh: 5"
+          keyboardType="numeric"
+          value={jumlah}
+          onChangeText={setJumlah}
+        />
+
+        <Text style={styles.label}>Keterangan / Keperluan:</Text>
+        <TextInput 
+          style={styles.input}
+          placeholder="Contoh: Untuk Bagian Ops..."
+          value={keterangan}
+          onChangeText={setKeterangan}
+        />
+
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: '#d9534f', marginTop: 5 }]} 
+          onPress={handleTambahKeKeranjang}
+        >
+          <Text style={styles.buttonText}>+ Masukkan ke Daftar</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.label}>Daftar Barang Keluar ({keranjang.length}):</Text>
+      {keranjang.length === 0 ? (
+        <Text style={[styles.subtitle, { marginBottom: 15, textAlign: 'left', fontStyle: 'italic' }]}>
+          Belum ada item ditambahkan ke daftar ini.
         </Text>
-        <Ionicons name="chevron-down" size={20} color="#666" />
-      </TouchableOpacity>
-
-      <Text style={styles.label}>Jumlah Keluar:</Text>
-      <TextInput 
-        style={styles.input}
-        placeholder="Contoh: 5"
-        keyboardType="numeric"
-        value={jumlah}
-        onChangeText={setJumlah}
-      />
-
-      <Text style={styles.label}>Keterangan / Keperluan:</Text>
-      <TextInput 
-        style={styles.input}
-        placeholder="Contoh: Untuk Bagian Ops..."
-        value={keterangan}
-        onChangeText={setKeterangan}
-      />
+      ) : (
+        keranjang.map((item) => (
+          <View key={item.id} style={[styles.logCard, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.logItemName}>[{item.kodeBarang}] {item.namaBarang}</Text>
+              <Text style={styles.logDetail}>Jumlah: {item.jumlah} Unit</Text>
+              {item.keterangan ? <Text style={styles.logDetail}>Ket: {item.keterangan}</Text> : null}
+            </View>
+            <TouchableOpacity 
+              style={[styles.iconButton, { backgroundColor: '#d9534f' }]} 
+              onPress={() => handleHapusDariKeranjang(item.id)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
 
       <TouchableOpacity 
-        style={[styles.button, { backgroundColor: '#d9534f', marginBottom: 30 }, loading && { backgroundColor: '#cccccc' }]} 
-        onPress={handleSimpanKeluarKeFirebase}
-        disabled={loading || !namaBarang}
+        style={[styles.button, { backgroundColor: '#d9534f', marginBottom: 30, marginTop: 15 }, loading && { backgroundColor: '#cccccc' }]} 
+        onPress={handleSimpanKeluarSemuaKeFirebase}
+        disabled={loading || keranjang.length === 0}
       >
         <Text style={styles.buttonText}>
-          {loading ? 'Menyimpan...' : 'Simpan Barang Keluar'}
+          {loading ? 'Menyimpan...' : 'Simpan Semua Barang Keluar'}
         </Text>
       </TouchableOpacity>
 
@@ -847,7 +983,7 @@ const LogBarangScreen = () => {
           jumlah: item.jumlah,
           jumlahTampil: `${item.jumlah} Unit/Pcs`,
           tanggal: item.tanggal || (item.createdAt ? item.createdAt.substring(0, 10) : '-'),
-          keterangan: item.keterangan, // Menambahkan baris ini agar keterangan masuk tampil di log
+          keterangan: item.keterangan,
           koleksiAsal: 'barangMasuk',
         });
       });
