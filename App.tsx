@@ -233,7 +233,6 @@ const ManajemenBarangScreen = () => {
     );
   };
 
-  // Render tiap item di Master Barang dengan Ikon
   const renderItemBarang = ({ item }: { item: any }) => (
     <View style={styles.logCard}>
       <View style={styles.logHeader}>
@@ -245,7 +244,6 @@ const ManajemenBarangScreen = () => {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={[styles.logItemName, { flex: 1 }]}>[{item.kode}] {item.nama}</Text>
 
-        {/* Tombol aksi berbentuk ikon */}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity 
             style={[styles.iconButton, { backgroundColor: '#ffc107' }]} 
@@ -397,6 +395,41 @@ const BarangMasukScreen = () => {
   const [namaBarang, setNamaBarang] = useState('');
   const [jumlah, setJumlah] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  const [listMaster, setListMaster] = useState<any[]>([]);
+  const [masterLoading, setMasterLoading] = useState(true);
+
+  const fetchMasterBarang = async () => {
+    try {
+      setMasterLoading(true);
+      const querySnapshot = await getDocs(collection(db, 'barangMaster'));
+      let tempData: any[] = [];
+      
+      querySnapshot.forEach((docItem) => {
+        const item = docItem.data();
+        tempData.push({
+          id: docItem.id,
+          nama: item.namaBarang,
+          kode: item.kodeBarang,
+        });
+      });
+      
+      setListMaster(tempData);
+      
+      if (tempData.length > 0) {
+        setNamaBarang(tempData[0].nama);
+      }
+    } catch (error) {
+      console.error("Gagal mengambil master barang: ", error);
+      Alert.alert('Error', 'Gagal memuat daftar barang dari master.');
+    } finally {
+      setMasterLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchMasterBarang();
+  }, []);
 
   const handleSimpanKeFirebase = async () => {
     if (namaBarang.trim() === '' || jumlah.trim() === '') {
@@ -414,8 +447,6 @@ const BarangMasukScreen = () => {
       });
 
       Alert.alert('Sukses', `Barang ${namaBarang} berhasil disimpan ke Database Firebase!`);
-      
-      setNamaBarang('');
       setJumlah('');
     } catch (error: any) {
       console.error("Gagal menyimpan data detail: ", error);
@@ -429,13 +460,28 @@ const BarangMasukScreen = () => {
     <View style={styles.formContainer}>
       <Text style={styles.title}>Input Barang Masuk (Firebase)</Text>
       
-      <Text style={styles.label}>Nama Barang:</Text>
-      <TextInput 
-        style={styles.input}
-        placeholder="Masukkan nama barang..."
-        value={namaBarang}
-        onChangeText={setNamaBarang}
-      />
+      <Text style={styles.label}>Pilih Nama Barang:</Text>
+      <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
+        {masterLoading ? (
+          <Text style={{ paddingHorizontal: 15, color: '#888' }}>Memuat daftar barang...</Text>
+        ) : listMaster.length === 0 ? (
+          <Text style={{ paddingHorizontal: 15, color: '#d9534f' }}>Master barang kosong. Tambah dulu!</Text>
+        ) : (
+          <Picker
+            selectedValue={namaBarang}
+            onValueChange={(itemValue: string) => setNamaBarang(itemValue)}
+            style={{ fontSize: 16, color: '#333', borderWidth: 0, width: '100%', height: '100%', outline: 'none' } as any}
+          >
+            {listMaster.map((item) => (
+              <Picker.Item 
+                key={item.id} 
+                label={`[${item.kode}] ${item.nama}`} 
+                value={item.nama} 
+              />
+            ))}
+          </Picker>
+        )}
+      </View>
 
       <Text style={styles.label}>Jumlah Masuk:</Text>
       <TextInput 
@@ -449,7 +495,7 @@ const BarangMasukScreen = () => {
       <TouchableOpacity 
         style={[styles.button, loading && { backgroundColor: '#cccccc' }]} 
         onPress={handleSimpanKeFirebase}
-        disabled={loading}
+        disabled={loading || listMaster.length === 0}
       >
         <Text style={styles.buttonText}>
           {loading ? 'Menyimpan...' : 'Simpan ke Database'}
@@ -465,6 +511,44 @@ const BarangKeluarScreen = () => {
   const [jumlah, setJumlah] = useState('');
   const [keterangan, setKeterangan] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // State baru untuk dropdown Barang Keluar
+  const [listMaster, setListMaster] = useState<any[]>([]);
+  const [masterLoading, setMasterLoading] = useState(true);
+
+  // Fungsi fetch yang sama dari Master Barang
+  const fetchMasterBarang = async () => {
+    try {
+      setMasterLoading(true);
+      const querySnapshot = await getDocs(collection(db, 'barangMaster'));
+      let tempData: any[] = [];
+      
+      querySnapshot.forEach((docItem) => {
+        const item = docItem.data();
+        tempData.push({
+          id: docItem.id,
+          nama: item.namaBarang,
+          kode: item.kodeBarang,
+        });
+      });
+      
+      setListMaster(tempData);
+      
+      // Jika data ada, atur otomatis ke pilihan pertama
+      if (tempData.length > 0) {
+        setNamaBarang(tempData[0].nama);
+      }
+    } catch (error) {
+      console.error("Gagal mengambil master barang: ", error);
+      Alert.alert('Error', 'Gagal memuat daftar barang dari master.');
+    } finally {
+      setMasterLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchMasterBarang();
+  }, []);
 
   const handleSimpanKeluarKeFirebase = async () => {
     if (namaBarang.trim() === '' || jumlah.trim() === '') {
@@ -484,7 +568,7 @@ const BarangKeluarScreen = () => {
 
       Alert.alert('Sukses', `Barang Keluar: ${namaBarang} sejumlah ${jumlah} berhasil dicatat ke Database!`);
       
-      setNamaBarang('');
+      // Kosongkan jumlah dan keterangan setelah simpan
       setJumlah('');
       setKeterangan('');
     } catch (error: any) {
@@ -499,13 +583,28 @@ const BarangKeluarScreen = () => {
     <View style={styles.formContainer}>
       <Text style={styles.title}>Input Barang Keluar (Firebase)</Text>
       
-      <Text style={styles.label}>Nama Barang:</Text>
-      <TextInput 
-        style={styles.input}
-        placeholder="Masukkan nama barang..."
-        value={namaBarang}
-        onChangeText={setNamaBarang}
-      />
+      <Text style={styles.label}>Pilih Nama Barang:</Text>
+      <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
+        {masterLoading ? (
+          <Text style={{ paddingHorizontal: 15, color: '#888' }}>Memuat daftar barang...</Text>
+        ) : listMaster.length === 0 ? (
+          <Text style={{ paddingHorizontal: 15, color: '#d9534f' }}>Master barang kosong. Tambah dulu!</Text>
+        ) : (
+          <Picker
+            selectedValue={namaBarang}
+            onValueChange={(itemValue: string) => setNamaBarang(itemValue)}
+            style={{ fontSize: 16, color: '#333', borderWidth: 0, width: '100%', height: '100%', outline: 'none' } as any}
+          >
+            {listMaster.map((item) => (
+              <Picker.Item 
+                key={item.id} 
+                label={`[${item.kode}] ${item.nama}`} 
+                value={item.nama} 
+              />
+            ))}
+          </Picker>
+        )}
+      </View>
 
       <Text style={styles.label}>Jumlah Keluar:</Text>
       <TextInput 
@@ -527,7 +626,7 @@ const BarangKeluarScreen = () => {
       <TouchableOpacity 
         style={[styles.button, { backgroundColor: '#d9534f' }, loading && { backgroundColor: '#cccccc' }]} 
         onPress={handleSimpanKeluarKeFirebase}
-        disabled={loading}
+        disabled={loading || listMaster.length === 0}
       >
         <Text style={styles.buttonText}>
           {loading ? 'Menyimpan...' : 'Simpan Barang Keluar'}
@@ -646,7 +745,6 @@ const LogBarangScreen = () => {
     );
   };
 
-  // Render log riwayat dengan tombol Ikon
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.logCard}>
       <View style={styles.logHeader}>
@@ -666,7 +764,6 @@ const LogBarangScreen = () => {
           {item.keterangan ? <Text style={styles.logDetail}>Ket: {item.keterangan}</Text> : null}
         </View>
 
-        {/* Tombol aksi ikon */}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity 
             style={[styles.iconButton, { backgroundColor: '#ffc107' }]} 
@@ -1058,7 +1155,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  // Style khusus tombol ikon baru
   iconButton: {
     width: 36,
     height: 36,
