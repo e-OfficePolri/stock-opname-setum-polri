@@ -3,6 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Modal, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+// Import ikon dari Expo Vector Icons
+import { Ionicons } from '@expo/vector-icons';
 
 // Import objek database Firestore dari file konfigurasi kita
 import { db } from './src/firebaseConfig';
@@ -231,6 +233,7 @@ const ManajemenBarangScreen = () => {
     );
   };
 
+  // Render tiap item di Master Barang dengan Ikon
   const renderItemBarang = ({ item }: { item: any }) => (
     <View style={styles.logCard}>
       <View style={styles.logHeader}>
@@ -238,22 +241,26 @@ const ManajemenBarangScreen = () => {
           Stok: {item.stok} {item.satuan.toUpperCase()}
         </Text>
       </View>
-      <Text style={styles.logItemName}>[{item.kode}] {item.nama}</Text>
+      
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={[styles.logItemName, { flex: 1 }]}>[{item.kode}] {item.nama}</Text>
 
-      <View style={styles.actionButtonContainer}>
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: '#ffc107', flex: 1, marginRight: 5 }]} 
-          onPress={() => handleBukaModalEdit(item)}
-        >
-          <Text style={styles.actionButtonText}>Edit</Text>
-        </TouchableOpacity>
+        {/* Tombol aksi berbentuk ikon */}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity 
+            style={[styles.iconButton, { backgroundColor: '#ffc107' }]} 
+            onPress={() => handleBukaModalEdit(item)}
+          >
+            <Ionicons name="pencil-outline" size={18} color="#333" />
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1 }]} 
-          onPress={() => handleDeleteItem(item)}
-        >
-          <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Hapus</Text>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.iconButton, { backgroundColor: '#d9534f' }]} 
+            onPress={() => handleDeleteItem(item)}
+          >
+            <Ionicons name="trash-outline" size={18} color="#FFF" />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -639,6 +646,7 @@ const LogBarangScreen = () => {
     );
   };
 
+  // Render log riwayat dengan tombol Ikon
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.logCard}>
       <View style={styles.logHeader}>
@@ -650,24 +658,30 @@ const LogBarangScreen = () => {
         </Text>
         <Text style={styles.logDate}>{item.tanggal}</Text>
       </View>
-      <Text style={styles.logItemName}>{item.nama}</Text>
-      <Text style={styles.logDetail}>Jumlah: {item.jumlahTampil}</Text>
-      {item.keterangan ? <Text style={styles.logDetail}>Ket: {item.keterangan}</Text> : null}
+      
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.logItemName}>{item.nama}</Text>
+          <Text style={styles.logDetail}>Jumlah: {item.jumlahTampil}</Text>
+          {item.keterangan ? <Text style={styles.logDetail}>Ket: {item.keterangan}</Text> : null}
+        </View>
 
-      <View style={styles.actionButtonContainer}>
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: '#ffc107', flex: 1, marginRight: 5 }]} 
-          onPress={() => handleBukaModalEdit(item)}
-        >
-          <Text style={styles.actionButtonText}>Edit</Text>
-        </TouchableOpacity>
+        {/* Tombol aksi ikon */}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity 
+            style={[styles.iconButton, { backgroundColor: '#ffc107' }]} 
+            onPress={() => handleBukaModalEdit(item)}
+          >
+            <Ionicons name="pencil-outline" size={18} color="#333" />
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1 }]} 
-          onPress={() => handleDeleteItem(item)}
-        >
-          <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Hapus</Text>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.iconButton, { backgroundColor: '#d9534f' }]} 
+            onPress={() => handleDeleteItem(item)}
+          >
+            <Ionicons name="trash-outline" size={18} color="#FFF" />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -1030,18 +1044,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
   },
-  editButton: {
-    backgroundColor: '#ffc107',
-    padding: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  editButtonText: {
-    color: '#333',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
   actionButtonContainer: {
     flexDirection: 'row',
     marginTop: 12,
@@ -1055,6 +1057,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     color: '#333',
+  },
+  // Style khusus tombol ikon baru
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalOverlay: {
     flex: 1,
