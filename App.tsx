@@ -79,7 +79,7 @@ const BerandaScreen = () => {
   );
 };
 
-// --- LAYAR MANAJEMEN BARANG MASTER ---
+// --- 2. LAYAR MANAJEMEN BARANG MASTER ---
 const ManajemenBarangScreen = () => {
   const [listBarang, setListBarang] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -263,67 +263,71 @@ const ManajemenBarangScreen = () => {
       style={styles.formContainer} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.title}>Manajemen Master Barang</Text>
-
-      <View style={{ backgroundColor: '#FFF', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0' }}>
-        <Text style={styles.label}>Tambah Jenis Barang Baru</Text>
+      <FlatList
+        data={listBarang}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItemBarang}
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }} 
         
-        <TextInput
-          style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d', marginBottom: 10 }]}
-          value={kodeBarang}
-          editable={false}
-          placeholder="Memuat kode..."
-        />
+        ListHeaderComponent={
+          <View>
+            <Text style={styles.title}>Manajemen Master Barang</Text>
 
-        <TextInput
-          style={[styles.input, { marginBottom: 10 }]}
-          placeholder="Nama Barang..."
-          value={namaBaru}
-          onChangeText={setNamaBaru}
-        />
+            <View style={{ backgroundColor: '#FFF', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0' }}>
+              <Text style={styles.label}>Tambah Jenis Barang Baru</Text>
+              
+              <TextInput
+                style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d', marginBottom: 10 }]}
+                value={kodeBarang}
+                editable={false}
+                placeholder="Memuat kode..."
+              />
 
-        <Text style={styles.label}>Pilih Satuan Barang:</Text>
+              <TextInput
+                style={[styles.input, { marginBottom: 10 }]}
+                placeholder="Nama Barang..."
+                value={namaBaru}
+                onChangeText={setNamaBaru}
+              />
+
+              <Text style={styles.label}>Pilih Satuan Barang:</Text>
+              
+              <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
+                <Picker
+                  selectedValue={satuan}
+                  onValueChange={(itemValue: string) => setSatuan(itemValue)}
+                  style={{ fontSize: 16, color: '#333', borderWidth: 0, width: '100%', height: '100%', outline: 'none' } as any}
+                  itemStyle={{ fontSize: 16 }}
+                >
+                  <Picker.Item label="PCS" value="PCS" />
+                  <Picker.Item label="BOX" value="BOX" />
+                  <Picker.Item label="PACK" value="PACK" />
+                  <Picker.Item label="ROLL" value="ROLL" />
+                  <Picker.Item label="LEMBAR" value="LEMBAR" />
+                  <Picker.Item label="RIM" value="RIM" />
+                  <Picker.Item label="SET" value="SET" /> 
+                </Picker>
+              </View>
+
+              <TouchableOpacity style={[styles.button, { marginTop: 0 }]} onPress={handleTambahBarangMaster}>
+                <Text style={styles.buttonText}>Simpan ke Master Barang</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.label, { marginBottom: 10 }]}>Daftar Inventaris Gudang:</Text>
+          </View>
+        }
         
-        <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
-          {/* --- PERBAIKAN UKURAN FONT PADA PICKER DI SINI --- */}
-          <Picker
-            selectedValue={satuan}
-            onValueChange={(itemValue: string) => setSatuan(itemValue)}
-            style={{ fontSize: 16, color: '#333', borderWidth: 0, width: '100%', height: '100%', outline: 'none' } as any}
-            itemStyle={{ fontSize: 16 }}
-          >
-            <Picker.Item label="PCS" value="PCS" />
-            <Picker.Item label="BOX" value="BOX" />
-            <Picker.Item label="PACK" value="PACK" />
-            <Picker.Item label="ROLL" value="ROLL" />
-            <Picker.Item label="LEMBAR" value="LEMBAR" />
-            <Picker.Item label="RIM" value="RIM" />
-            <Picker.Item label="SET" value="SET" /> 
-          </Picker>
-        </View>
+        ListEmptyComponent={
+          loading ? (
+            <Text style={styles.subtitle}>Memuat data...</Text>
+          ) : (
+            <Text style={styles.subtitle}>Belum ada master barang.</Text>
+          )
+        }
+      />
 
-        <TouchableOpacity style={[styles.button, { marginTop: 0 }]} onPress={handleTambahBarangMaster}>
-          <Text style={styles.buttonText}>Simpan ke Master Barang</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={[styles.label, { marginBottom: 10 }]}>Daftar Inventaris Gudang:</Text>
-      
-      {loading ? (
-        <Text style={styles.subtitle}>Memuat data...</Text>
-      ) : listBarang.length === 0 ? (
-        <Text style={styles.subtitle}>Belum ada master barang.</Text>
-      ) : (
-        <FlatList
-          data={listBarang}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItemBarang}
-          showsVerticalScrollIndicator={false}
-          style={{ flex: 1 }} 
-        />
-      )}
-
-      {/* MODAL UNTUK EDIT DATA BARANG */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -344,7 +348,6 @@ const ManajemenBarangScreen = () => {
 
             <Text style={styles.label}>Satuan:</Text>
             <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
-              {/* --- PERBAIKAN UKURAN FONT PADA PICKER DI MODAL JUGA DI SINI --- */}
               <Picker
                 selectedValue={satuanEdit}
                 onValueChange={(itemValue: string) => setSatuanEdit(itemValue)}
@@ -382,7 +385,7 @@ const ManajemenBarangScreen = () => {
   );
 };
 
-// --- LAYAR BARANG MASUK ---
+// --- 3. LAYAR BARANG MASUK ---
 const BarangMasukScreen = () => {
   const [namaBarang, setNamaBarang] = useState('');
   const [jumlah, setJumlah] = useState('');
@@ -397,7 +400,7 @@ const BarangMasukScreen = () => {
     try {
       setLoading(true);
       
-      const docRef = await addDoc(collection(db, 'barangMasuk'), {
+      await addDoc(collection(db, 'barangMasuk'), {
         namaBarang: namaBarang,
         jumlah: Number(jumlah),
         tanggal: new Date().toISOString(),
@@ -449,7 +452,7 @@ const BarangMasukScreen = () => {
   );
 };
 
-// --- LAYAR BARANG KELUAR ---
+// --- 4. LAYAR BARANG KELUAR ---
 const BarangKeluarScreen = () => {
   const [namaBarang, setNamaBarang] = useState('');
   const [jumlah, setJumlah] = useState('');
@@ -465,7 +468,7 @@ const BarangKeluarScreen = () => {
     try {
       setLoading(true);
       
-      const docRef = await addDoc(collection(db, 'barangKeluar'), {
+      await addDoc(collection(db, 'barangKeluar'), {
         namaBarang: namaBarang,
         jumlah: Number(jumlah),
         keterangan: keterangan,
@@ -527,7 +530,7 @@ const BarangKeluarScreen = () => {
   );
 };
 
-// --- LAYAR LOG BARANG ---
+// --- 5. LAYAR LOG BARANG ---
 const LogBarangScreen = () => {
   const [logData, setLogData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -722,6 +725,7 @@ const LogBarangScreen = () => {
   );
 };
 
+// --- 6. LAYAR LAPORAN ---
 const LaporanScreen = () => {
   const [totalMasuk, setTotalMasuk] = useState(0);
   const [totalKeluar, setTotalKeluar] = useState(0);
@@ -785,6 +789,7 @@ const LaporanScreen = () => {
   );
 };
 
+// --- 7. LAYAR MANAJEMEN USER ---
 const ManajemenUserScreen = () => {
   const [userData, setUserData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
