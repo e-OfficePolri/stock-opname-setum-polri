@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Modal, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Modal, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 
 // Import objek database Firestore dari file konfigurasi kita
@@ -266,21 +266,25 @@ const ManajemenBarangScreen = () => {
   );
 
   return (
-    <View style={styles.formContainer}>
+    <KeyboardAvoidingView 
+      style={styles.formContainer} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <Text style={styles.title}>Manajemen Master Barang</Text>
 
-      <ScrollView style={{ backgroundColor: '#FFF', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0' }} showsVerticalScrollIndicator={false}>
+      {/* Bagian Form: Mengubah ScrollView menjadi View biasa agar posisinya terkunci */}
+      <View style={{ backgroundColor: '#FFF', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0' }}>
         <Text style={styles.label}>Tambah Jenis Barang Baru</Text>
         
         <TextInput
-          style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
+          style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d', marginBottom: 10 }]}
           value={kodeBarang}
           editable={false}
           placeholder="Memuat kode..."
         />
 
         <TextInput
-          style={styles.input}
+          style={[styles.input, { marginBottom: 10 }]}
           placeholder="Nama Barang..."
           value={namaBaru}
           onChangeText={setNamaBaru}
@@ -299,15 +303,19 @@ const ManajemenBarangScreen = () => {
             <Picker.Item label="ROLL" value="ROLL" />
             <Picker.Item label="LEMBAR" value="LEMBAR" />
             <Picker.Item label="RIM" value="RIM" />
+            {/* Tambahan satuan SET */}
+            <Picker.Item label="SET" value="SET" /> 
           </Picker>
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleTambahBarangMaster}>
+        <TouchableOpacity style={[styles.button, { marginTop: 0 }]} onPress={handleTambahBarangMaster}>
           <Text style={styles.buttonText}>Simpan ke Master Barang</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
 
       <Text style={[styles.label, { marginBottom: 10 }]}>Daftar Inventaris Gudang:</Text>
+      
+      {/* Bagian Daftar: Karena memakai flex: 1 secara default di dalam container, ini akan otomatis mengisi area bawah */}
       {loading ? (
         <Text style={styles.subtitle}>Memuat data...</Text>
       ) : listBarang.length === 0 ? (
@@ -318,6 +326,7 @@ const ManajemenBarangScreen = () => {
           keyExtractor={(item) => item.id}
           renderItem={renderItemBarang}
           showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }} // Memastikan daftar mengambil sisa ruang yang ada
         />
       )}
 
@@ -352,6 +361,8 @@ const ManajemenBarangScreen = () => {
                 <Picker.Item label="ROLL" value="ROLL" />
                 <Picker.Item label="LEMBAR" value="LEMBAR" />
                 <Picker.Item label="RIM" value="RIM" />
+                {/* Tambahan satuan SET untuk fitur edit */}
+                <Picker.Item label="SET" value="SET" />
               </Picker>
             </View>
 
@@ -372,7 +383,7 @@ const ManajemenBarangScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -391,7 +402,6 @@ const BarangMasukScreen = () => {
     try {
       setLoading(true);
       
-      // Memastikan data dikirim ke koleksi 'barangMasuk' dengan tipe data yang pas
       const docRef = await addDoc(collection(db, 'barangMasuk'), {
         namaBarang: namaBarang,
         jumlah: Number(jumlah),
@@ -450,7 +460,7 @@ const BarangKeluarScreen = () => {
   const [namaBarang, setNamaBarang] = useState('');
   const [jumlah, setJumlah] = useState('');
   const [keterangan, setKeterangan] = useState('');
-  const [loading, setLoading] = useState(false); // Penanda saat data dikirim
+  const [loading, setLoading] = useState(false);
 
   const handleSimpanKeluarKeFirebase = async () => {
     if (namaBarang.trim() === '' || jumlah.trim() === '') {
@@ -461,7 +471,6 @@ const BarangKeluarScreen = () => {
     try {
       setLoading(true);
       
-      // Mengirim data ke koleksi 'barangKeluar' di Firestore Database
       const docRef = await addDoc(collection(db, 'barangKeluar'), {
         namaBarang: namaBarang,
         jumlah: Number(jumlah),
@@ -472,7 +481,6 @@ const BarangKeluarScreen = () => {
       console.log("Berhasil menyimpan barang keluar dengan ID: ", docRef.id);
       Alert.alert('Sukses', `Barang Keluar: ${namaBarang} sejumlah ${jumlah} berhasil dicatat ke Database!`);
       
-      // Mengosongkan form setelah berhasil
       setNamaBarang('');
       setJumlah('');
       setKeterangan('');
@@ -529,19 +537,15 @@ const BarangKeluarScreen = () => {
 const LogBarangScreen = () => {
   const [logData, setLogData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // State untuk mengontrol Modal Edit
   const [modalVisible, setModalVisible] = useState(false);
   const [itemYangDiedit, setItemYangDiedit] = useState<any>(null);
   const [textBaru, setTextBaru] = useState('');
 
-  // Fungsi untuk mengambil data dari Firestore
   const fetchLogData = async () => {
     try {
       setLoading(true);
       let tempData: any[] = [];
 
-      // 1. Ambil data dari koleksi 'barangMasuk'
       const querySnapshotMasuk = await getDocs(collection(db, 'barangMasuk'));
       querySnapshotMasuk.forEach((docItem) => {
         const item = docItem.data();
@@ -556,7 +560,6 @@ const LogBarangScreen = () => {
         });
       });
 
-      // 2. Ambil data dari koleksi 'barangKeluar'
       const querySnapshotKeluar = await getDocs(collection(db, 'barangKeluar'));
       querySnapshotKeluar.forEach((docItem) => {
         const item = docItem.data();
@@ -585,14 +588,12 @@ const LogBarangScreen = () => {
     fetchLogData();
   }, []);
 
-  // Membuka Modal Edit saat tombol Edit ditekan
   const handleBukaModalEdit = (item: any) => {
     setItemYangDiedit(item);
-    setTextBaru(item.nama); // Mengisi input dengan nama barang yang lama
+    setTextBaru(item.nama);
     setModalVisible(true);
   };
 
-  // Menyimpan perubahan data ke Firebase Firestore
   const handleSimpanPerubahan = async () => {
     if (!textBaru || textBaru.trim() === '') {
       Alert.alert('Peringatan', 'Nama barang tidak boleh kosong!');
@@ -607,15 +608,14 @@ const LogBarangScreen = () => {
       });
 
       Alert.alert('Sukses', 'Data barang berhasil diperbarui!');
-      setModalVisible(false); // Tutup modal
-      fetchLogData(); // Muat ulang daftar data secara real-time
+      setModalVisible(false);
+      fetchLogData();
     } catch (err: any) {
       console.error("Gagal mengupdate: ", err);
       Alert.alert('Error', `Gagal memperbarui: ${err.message}`);
     }
   };
 
-  // Fungsi untuk Menghapus data (Delete) dari Firebase
   const handleDeleteItem = (item: any) => {
     Alert.alert(
       'Konfirmasi Hapus',
@@ -657,7 +657,6 @@ const LogBarangScreen = () => {
       <Text style={styles.logDetail}>Jumlah: {item.jumlahTampil}</Text>
       {item.keterangan ? <Text style={styles.logDetail}>Ket: {item.keterangan}</Text> : null}
 
-      {/* Tombol Interaktif Edit & Hapus */}
       <View style={styles.actionButtonContainer}>
         <TouchableOpacity 
           style={[styles.actionButton, { backgroundColor: '#ffc107', flex: 1, marginRight: 5 }]} 
@@ -693,7 +692,6 @@ const LogBarangScreen = () => {
         />
       )}
 
-      {/* MODAL KOTAK DIALOG EDIT (SUPAYA BERFUNGSI SEMPURNA) */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -735,21 +733,18 @@ const LaporanScreen = () => {
   const [totalKeluar, setTotalKeluar] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Fungsi untuk menghitung rekapitulasi data dari Firebase
   const fetchLaporanData = async () => {
     try {
       setLoading(true);
       let countMasuk = 0;
       let countKeluar = 0;
 
-      // Hitung total dokumen barang masuk
       const querySnapshotMasuk = await getDocs(collection(db, 'barangMasuk'));
       querySnapshotMasuk.forEach((doc) => {
         const item = doc.data();
         countMasuk += Number(item.jumlah || 0);
       });
 
-      // Hitung total dokumen barang keluar
       const querySnapshotKeluar = await getDocs(collection(db, 'barangKeluar'));
       querySnapshotKeluar.forEach((doc) => {
         const item = doc.data();
@@ -766,7 +761,6 @@ const LaporanScreen = () => {
     }
   };
 
-  // Jalankan perhitungan otomatis saat menu Laporan dibuka
   React.useEffect(() => {
     fetchLaporanData();
   }, []);
@@ -801,7 +795,6 @@ const ManajemenUserScreen = () => {
   const [userData, setUserData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fungsi untuk mengambil daftar user dari Firestore
   const fetchUsers = async () => {
     try {
       setLoading(true);
@@ -829,7 +822,6 @@ const ManajemenUserScreen = () => {
     fetchUsers();
   }, []);
 
-  // Simulasi/Fungsi tambah petugas baru ke Firebase
   const handleTambahUser = async () => {
     try {
       const namaBaru = 'Petugas Baru ' + Math.floor(Math.random() * 100);
@@ -840,7 +832,7 @@ const ManajemenUserScreen = () => {
         tanggalDibuat: new Date().toISOString(),
       });
       Alert.alert('Sukses', `Petugas ${namaBaru} berhasil ditambahkan!`);
-      fetchUsers(); // Muat ulang daftar user
+      fetchUsers();
     } catch (error) {
       console.error("Gagal menambah user: ", error);
       Alert.alert('Error', 'Gagal menambahkan petugas baru.');
