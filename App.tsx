@@ -20,13 +20,11 @@ const BerandaScreen = () => {
       let masuk = 0;
       let keluar = 0;
 
-      // Hitung total dari koleksi barangMasuk
       const snapshotMasuk = await getDocs(collection(db, 'barangMasuk'));
       snapshotMasuk.forEach((doc) => {
         masuk += Number(doc.data().jumlah || 0);
       });
 
-      // Hitung total dari koleksi barangKeluar
       const snapshotKeluar = await getDocs(collection(db, 'barangKeluar'));
       snapshotKeluar.forEach((doc) => {
         keluar += Number(doc.data().jumlah || 0);
@@ -55,7 +53,6 @@ const BerandaScreen = () => {
         Sistem Informasi Manajemen Stock Opname (Firebase)
       </Text>
 
-      {/* Kartu Grafik Statistik 1: Total Barang Masuk */}
       <View style={[styles.statCard, { borderLeftColor: '#28a745' }]}>
         <Text style={styles.statLabel}>Akumulasi Barang Masuk</Text>
         <Text style={[styles.statValue, { color: '#28a745' }]}>
@@ -64,7 +61,6 @@ const BerandaScreen = () => {
         <Text style={styles.statDesc}>Total seluruh barang yang masuk ke gudang.</Text>
       </View>
 
-      {/* Kartu Grafik Statistik 2: Total Barang Keluar */}
       <View style={[styles.statCard, { borderLeftColor: '#d9534f' }]}>
         <Text style={styles.statLabel}>Akumulasi Barang Keluar</Text>
         <Text style={[styles.statValue, { color: '#d9534f' }]}>
@@ -73,7 +69,6 @@ const BerandaScreen = () => {
         <Text style={styles.statDesc}>Total seluruh barang yang telah dikeluarkan.</Text>
       </View>
 
-      {/* Kartu Grafik Statistik 3: Estimasi Sisa Stok */}
       <View style={[styles.statCard, { borderLeftColor: '#0056b3' }]}>
         <Text style={styles.statLabel}>Estimasi Sisa Stok Bersih</Text>
         <Text style={[styles.statValue, { color: '#0056b3' }]}>
@@ -85,23 +80,20 @@ const BerandaScreen = () => {
   );
 };
 
-// --- LAYAR MANAJEMEN BARANG MASTER (DENGAN CRUD LENGKAP) ---
+// --- LAYAR MANAJEMEN BARANG MASTER ---
 const ManajemenBarangScreen = () => {
   const [listBarang, setListBarang] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // State untuk form input Tambah Barang
   const [kodeBarang, setKodeBarang] = useState('');
   const [namaBaru, setNamaBaru] = useState('');
-  const [satuan, setSatuan] = useState('');
+  const [satuan, setSatuan] = useState('PCS'); // Default diset ke PCS huruf besar
   
-  // State untuk fitur EDIT (Update)
   const [modalEditVisible, setModalEditVisible] = useState(false);
   const [itemYangDiedit, setItemYangDiedit] = useState<any>(null);
   const [namaEdit, setNamaEdit] = useState('');
   const [satuanEdit, setSatuanEdit] = useState('');
 
-  // Fungsi untuk menghasilkan Kode Barang Otomatis (STM-1, STM-2, dst.)
   const generateKodeOtomatis = (dataBarang: any[]) => {
     if (dataBarang.length === 0) {
       setKodeBarang('STM-1');
@@ -123,7 +115,6 @@ const ManajemenBarangScreen = () => {
     setKodeBarang(kodeBerikutnya);
   };
 
-  // READ: Ambil data master barang dari Firebase
   const fetchBarangMaster = async () => {
     try {
       setLoading(true);
@@ -135,10 +126,19 @@ const ManajemenBarangScreen = () => {
           id: docItem.id,
           kode: item.kodeBarang || '-',
           nama: item.namaBarang,
-          satuan: item.satuan || 'Pcs',
+          satuan: item.satuan || 'PCS',
           stok: item.stokAwal || 0,
         });
       });
+
+      // --- LOGIKA SORTING (MENGURUTKAN) BERDASARKAN ANGKA KODE BARANG ---
+      tempData.sort((a, b) => {
+        // Mengambil angka dari "STM-1", "STM-2", dst.
+        const angkaA = parseInt(a.kode.replace('STM-', '')) || 0;
+        const angkaB = parseInt(b.kode.replace('STM-', '')) || 0;
+        return angkaA - angkaB; // Urutkan dari terkecil ke terbesar
+      });
+
       setListBarang(tempData);
       generateKodeOtomatis(tempData);
     } catch (error) {
@@ -153,7 +153,6 @@ const ManajemenBarangScreen = () => {
     fetchBarangMaster();
   }, []);
 
-  // CREATE: Tambah barang master baru ke Firebase
   const handleTambahBarangMaster = async () => {
     if (!namaBaru.trim() || !kodeBarang.trim()) {
       Alert.alert('Peringatan', 'Nama Barang wajib diisi!');
@@ -164,14 +163,14 @@ const ManajemenBarangScreen = () => {
       await addDoc(collection(db, 'barangMaster'), {
         kodeBarang: kodeBarang.trim(),
         namaBarang: namaBaru.trim(),
-        satuan: satuan.trim() ? satuan.trim() : 'Pcs',
+        satuan: satuan.trim() ? satuan.trim() : 'PCS',
         stokAwal: 0,
         tanggalDibuat: new Date().toISOString(),
       });
 
       Alert.alert('Sukses', `Barang "${namaBaru}" berhasil ditambahkan!`);
       setNamaBaru('');
-      setSatuan('');
+      setSatuan('PCS'); // Kembalikan default ke PCS
       fetchBarangMaster(); 
     } catch (error: any) {
       console.error("Gagal menambah barang: ", error);
@@ -179,7 +178,6 @@ const ManajemenBarangScreen = () => {
     }
   };
 
-  // UPDATE: Membuka Modal Edit dan mengisi data lama
   const handleBukaModalEdit = (item: any) => {
     setItemYangDiedit(item);
     setNamaEdit(item.nama);
@@ -187,7 +185,6 @@ const ManajemenBarangScreen = () => {
     setModalEditVisible(true);
   };
 
-  // UPDATE: Menyimpan perubahan data ke Firebase
   const handleSimpanEdit = async () => {
     if (!namaEdit.trim()) {
       Alert.alert('Peringatan', 'Nama barang tidak boleh kosong!');
@@ -211,7 +208,6 @@ const ManajemenBarangScreen = () => {
     }
   };
 
-  // DELETE: Fungsi untuk Menghapus data dari Firebase
   const handleDeleteItem = (item: any) => {
     Alert.alert(
       'Konfirmasi Hapus',
@@ -238,15 +234,16 @@ const ManajemenBarangScreen = () => {
     );
   };
 
-  // Tampilan per item pada daftar (FlatList)
   const renderItemBarang = ({ item }: { item: any }) => (
     <View style={styles.logCard}>
       <View style={styles.logHeader}>
-        <Text style={[styles.badge, { backgroundColor: '#0056b3' }]}>Stok: {item.stok} {item.satuan}</Text>
+        {/* --- MENGUBAH SATUAN MENJADI HURUF BESAR SEMUA DENGAN .toUpperCase() --- */}
+        <Text style={[styles.badge, { backgroundColor: '#0056b3' }]}>
+          Stok: {item.stok} {item.satuan.toUpperCase()}
+        </Text>
       </View>
       <Text style={styles.logItemName}>[{item.kode}] {item.nama}</Text>
 
-      {/* Tombol Interaktif Edit & Hapus */}
       <View style={styles.actionButtonContainer}>
         <TouchableOpacity 
           style={[styles.actionButton, { backgroundColor: '#ffc107', flex: 1, marginRight: 5 }]} 
@@ -272,7 +269,6 @@ const ManajemenBarangScreen = () => {
     >
       <Text style={styles.title}>Manajemen Master Barang</Text>
 
-      {/* Bagian Form: Mengubah ScrollView menjadi View biasa agar posisinya terkunci */}
       <View style={{ backgroundColor: '#FFF', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0' }}>
         <Text style={styles.label}>Tambah Jenis Barang Baru</Text>
         
@@ -292,7 +288,8 @@ const ManajemenBarangScreen = () => {
 
         <Text style={styles.label}>Pilih Satuan Barang:</Text>
         
-        <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden' }}>
+        {/* --- PERBAIKAN UKURAN PICKER: Menambahkan height: 54 dan justifyContent --- */}
+        <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
           <Picker
             selectedValue={satuan}
             onValueChange={(itemValue: string) => setSatuan(itemValue)}
@@ -303,7 +300,6 @@ const ManajemenBarangScreen = () => {
             <Picker.Item label="ROLL" value="ROLL" />
             <Picker.Item label="LEMBAR" value="LEMBAR" />
             <Picker.Item label="RIM" value="RIM" />
-            {/* Tambahan satuan SET */}
             <Picker.Item label="SET" value="SET" /> 
           </Picker>
         </View>
@@ -315,7 +311,6 @@ const ManajemenBarangScreen = () => {
 
       <Text style={[styles.label, { marginBottom: 10 }]}>Daftar Inventaris Gudang:</Text>
       
-      {/* Bagian Daftar: Karena memakai flex: 1 secara default di dalam container, ini akan otomatis mengisi area bawah */}
       {loading ? (
         <Text style={styles.subtitle}>Memuat data...</Text>
       ) : listBarang.length === 0 ? (
@@ -326,7 +321,7 @@ const ManajemenBarangScreen = () => {
           keyExtractor={(item) => item.id}
           renderItem={renderItemBarang}
           showsVerticalScrollIndicator={false}
-          style={{ flex: 1 }} // Memastikan daftar mengambil sisa ruang yang ada
+          style={{ flex: 1 }} 
         />
       )}
 
@@ -350,7 +345,8 @@ const ManajemenBarangScreen = () => {
             />
 
             <Text style={styles.label}>Satuan:</Text>
-            <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden' }}>
+            {/* --- PERBAIKAN UKURAN PICKER DI DALAM MODAL --- */}
+            <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
               <Picker
                 selectedValue={satuanEdit}
                 onValueChange={(itemValue: string) => setSatuanEdit(itemValue)}
@@ -361,7 +357,6 @@ const ManajemenBarangScreen = () => {
                 <Picker.Item label="ROLL" value="ROLL" />
                 <Picker.Item label="LEMBAR" value="LEMBAR" />
                 <Picker.Item label="RIM" value="RIM" />
-                {/* Tambahan satuan SET untuk fitur edit */}
                 <Picker.Item label="SET" value="SET" />
               </Picker>
             </View>
@@ -387,7 +382,7 @@ const ManajemenBarangScreen = () => {
   );
 };
 
-// --- 2. LAYAR BARANG MASUK (TERHUBUNG KE FIREBASE) ---
+// --- LAYAR BARANG MASUK ---
 const BarangMasukScreen = () => {
   const [namaBarang, setNamaBarang] = useState('');
   const [jumlah, setJumlah] = useState('');
@@ -408,7 +403,6 @@ const BarangMasukScreen = () => {
         tanggal: new Date().toISOString(),
       });
 
-      console.log("Berhasil menyimpan dengan ID: ", docRef.id);
       Alert.alert('Sukses', `Barang ${namaBarang} berhasil disimpan ke Database Firebase!`);
       
       setNamaBarang('');
@@ -478,7 +472,6 @@ const BarangKeluarScreen = () => {
         tanggal: new Date().toISOString(),
       });
 
-      console.log("Berhasil menyimpan barang keluar dengan ID: ", docRef.id);
       Alert.alert('Sukses', `Barang Keluar: ${namaBarang} sejumlah ${jumlah} berhasil dicatat ke Database!`);
       
       setNamaBarang('');
@@ -534,6 +527,7 @@ const BarangKeluarScreen = () => {
   );
 };
 
+// --- LAYAR LOG BARANG ---
 const LogBarangScreen = () => {
   const [logData, setLogData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1073,4 +1067,3 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 });
-
