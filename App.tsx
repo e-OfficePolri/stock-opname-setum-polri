@@ -404,6 +404,8 @@ const BarangMasukScreen = () => {
   const [namaBarang, setNamaBarang] = useState('');
   const [kodeTerpilih, setKodeTerpilih] = useState('');
   const [jumlah, setJumlah] = useState('');
+  // Menambahkan state baru untuk keterangan
+  const [keterangan, setKeterangan] = useState('');
   const [loading, setLoading] = useState(false);
   
   const [listMaster, setListMaster] = useState<any[]>([]);
@@ -467,20 +469,24 @@ const BarangMasukScreen = () => {
     try {
       setLoading(true);
       
+      // Memasukkan keterangan ke dalam database
       await addDoc(collection(db, 'barangMasuk'), {
         noDokumen: noDokumen.trim(),
         tanggal: tanggalInput.trim(),
         kodeBarang: kodeTerpilih,
         namaBarang: namaBarang,
         jumlah: Number(jumlah),
+        keterangan: keterangan.trim(), // Data keterangan disimpan di sini
         createdAt: new Date().toISOString(),
       });
 
       Alert.alert('Sukses', `Barang ${namaBarang} dengan No. Dokumen ${noDokumen} berhasil disimpan!`);
       
+      // Mereset form kembali kosong
       setNoDokumen('');
       setTanggalInput(getTanggalHariIni());
       setJumlah('');
+      setKeterangan(''); // Reset keterangan juga
       setNamaBarang('');
       setKodeTerpilih('');
     } catch (error: any) {
@@ -540,6 +546,15 @@ const BarangMasukScreen = () => {
         keyboardType="numeric"
         value={jumlah}
         onChangeText={setJumlah}
+      />
+
+      {/* Menambahkan Kolom UI Keterangan di Sini */}
+      <Text style={styles.label}>Keterangan (Opsional):</Text>
+      <TextInput 
+        style={styles.input}
+        placeholder="Contoh: Dari vendor / kondisi baik..."
+        value={keterangan}
+        onChangeText={setKeterangan}
       />
 
       <TouchableOpacity 
@@ -832,6 +847,7 @@ const LogBarangScreen = () => {
           jumlah: item.jumlah,
           jumlahTampil: `${item.jumlah} Unit/Pcs`,
           tanggal: item.tanggal || (item.createdAt ? item.createdAt.substring(0, 10) : '-'),
+          keterangan: item.keterangan, // Menambahkan baris ini agar keterangan masuk tampil di log
           koleksiAsal: 'barangMasuk',
         });
       });
