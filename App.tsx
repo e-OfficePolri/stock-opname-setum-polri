@@ -393,6 +393,7 @@ const ManajemenBarangScreen = () => {
 // --- 3. LAYAR BARANG MASUK ---
 const BarangMasukScreen = () => {
   const [namaBarang, setNamaBarang] = useState('');
+  const [kodeTerpilih, setKodeTerpilih] = useState('');
   const [jumlah, setJumlah] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -410,14 +411,22 @@ const BarangMasukScreen = () => {
         tempData.push({
           id: docItem.id,
           nama: item.namaBarang,
-          kode: item.kodeBarang,
+          kode: item.kodeBarang || '-',
         });
       });
       
+      // Mengurutkan data master berdasarkan kode secara numerik (STM-1, STM-2, dst.)
+      tempData.sort((a, b) => {
+        const angkaA = parseInt(a.kode.replace('STM-', '')) || 0;
+        const angkaB = parseInt(b.kode.replace('STM-', '')) || 0;
+        return angkaA - angkaB; 
+      });
+
       setListMaster(tempData);
       
       if (tempData.length > 0) {
         setNamaBarang(tempData[0].nama);
+        setKodeTerpilih(tempData[0].kode);
       }
     } catch (error) {
       console.error("Gagal mengambil master barang: ", error);
@@ -431,6 +440,15 @@ const BarangMasukScreen = () => {
     fetchMasterBarang();
   }, []);
 
+  // Fungsi saat pilihan dropdown berubah untuk memperbarui kode otomatis di atasnya
+  const handlePilihBarang = (nama: string) => {
+    setNamaBarang(nama);
+    const selectedItem = listMaster.find((item) => item.nama === nama);
+    if (selectedItem) {
+      setKodeTerpilih(selectedItem.kode);
+    }
+  };
+
   const handleSimpanKeFirebase = async () => {
     if (namaBarang.trim() === '' || jumlah.trim() === '') {
       Alert.alert('Peringatan', 'Semua kolom harus diisi!');
@@ -441,6 +459,7 @@ const BarangMasukScreen = () => {
       setLoading(true);
       
       await addDoc(collection(db, 'barangMasuk'), {
+        kodeBarang: kodeTerpilih,
         namaBarang: namaBarang,
         jumlah: Number(jumlah),
         tanggal: new Date().toISOString(),
@@ -460,6 +479,14 @@ const BarangMasukScreen = () => {
     <View style={styles.formContainer}>
       <Text style={styles.title}>Input Barang Masuk (Firebase)</Text>
       
+      <Text style={styles.label}>Kode Barang:</Text>
+      <TextInput 
+        style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
+        value={kodeTerpilih}
+        editable={false}
+        placeholder="Kode barang..."
+      />
+
       <Text style={styles.label}>Pilih Nama Barang:</Text>
       <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
         {masterLoading ? (
@@ -469,13 +496,13 @@ const BarangMasukScreen = () => {
         ) : (
           <Picker
             selectedValue={namaBarang}
-            onValueChange={(itemValue: string) => setNamaBarang(itemValue)}
+            onValueChange={(itemValue: string) => handlePilihBarang(itemValue)}
             style={{ fontSize: 16, color: '#333', borderWidth: 0, width: '100%', height: '100%', outline: 'none' } as any}
           >
             {listMaster.map((item) => (
               <Picker.Item 
                 key={item.id} 
-                label={`[${item.kode}] ${item.nama}`} 
+                label={item.nama} 
                 value={item.nama} 
               />
             ))}
@@ -508,15 +535,14 @@ const BarangMasukScreen = () => {
 // --- 4. LAYAR BARANG KELUAR ---
 const BarangKeluarScreen = () => {
   const [namaBarang, setNamaBarang] = useState('');
+  const [kodeTerpilih, setKodeTerpilih] = useState('');
   const [jumlah, setJumlah] = useState('');
   const [keterangan, setKeterangan] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // State baru untuk dropdown Barang Keluar
   const [listMaster, setListMaster] = useState<any[]>([]);
   const [masterLoading, setMasterLoading] = useState(true);
 
-  // Fungsi fetch yang sama dari Master Barang
   const fetchMasterBarang = async () => {
     try {
       setMasterLoading(true);
@@ -528,15 +554,22 @@ const BarangKeluarScreen = () => {
         tempData.push({
           id: docItem.id,
           nama: item.namaBarang,
-          kode: item.kodeBarang,
+          kode: item.kodeBarang || '-',
         });
       });
       
+      // Mengurutkan data master berdasarkan kode secara numerik (STM-1, STM-2, dst.)
+      tempData.sort((a, b) => {
+        const angkaA = parseInt(a.kode.replace('STM-', '')) || 0;
+        const angkaB = parseInt(b.kode.replace('STM-', '')) || 0;
+        return angkaA - angkaB; 
+      });
+
       setListMaster(tempData);
       
-      // Jika data ada, atur otomatis ke pilihan pertama
       if (tempData.length > 0) {
         setNamaBarang(tempData[0].nama);
+        setKodeTerpilih(tempData[0].kode);
       }
     } catch (error) {
       console.error("Gagal mengambil master barang: ", error);
@@ -550,6 +583,14 @@ const BarangKeluarScreen = () => {
     fetchMasterBarang();
   }, []);
 
+  const handlePilihBarang = (nama: string) => {
+    setNamaBarang(nama);
+    const selectedItem = listMaster.find((item) => item.nama === nama);
+    if (selectedItem) {
+      setKodeTerpilih(selectedItem.kode);
+    }
+  };
+
   const handleSimpanKeluarKeFirebase = async () => {
     if (namaBarang.trim() === '' || jumlah.trim() === '') {
       Alert.alert('Peringatan', 'Nama barang dan jumlah wajib diisi!');
@@ -560,6 +601,7 @@ const BarangKeluarScreen = () => {
       setLoading(true);
       
       await addDoc(collection(db, 'barangKeluar'), {
+        kodeBarang: kodeTerpilih,
         namaBarang: namaBarang,
         jumlah: Number(jumlah),
         keterangan: keterangan,
@@ -568,7 +610,6 @@ const BarangKeluarScreen = () => {
 
       Alert.alert('Sukses', `Barang Keluar: ${namaBarang} sejumlah ${jumlah} berhasil dicatat ke Database!`);
       
-      // Kosongkan jumlah dan keterangan setelah simpan
       setJumlah('');
       setKeterangan('');
     } catch (error: any) {
@@ -583,6 +624,14 @@ const BarangKeluarScreen = () => {
     <View style={styles.formContainer}>
       <Text style={styles.title}>Input Barang Keluar (Firebase)</Text>
       
+      <Text style={styles.label}>Kode Barang:</Text>
+      <TextInput 
+        style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
+        value={kodeTerpilih}
+        editable={false}
+        placeholder="Kode barang..."
+      />
+
       <Text style={styles.label}>Pilih Nama Barang:</Text>
       <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
         {masterLoading ? (
@@ -592,13 +641,13 @@ const BarangKeluarScreen = () => {
         ) : (
           <Picker
             selectedValue={namaBarang}
-            onValueChange={(itemValue: string) => setNamaBarang(itemValue)}
+            onValueChange={(itemValue: string) => handlePilihBarang(itemValue)}
             style={{ fontSize: 16, color: '#333', borderWidth: 0, width: '100%', height: '100%', outline: 'none' } as any}
           >
             {listMaster.map((item) => (
               <Picker.Item 
                 key={item.id} 
-                label={`[${item.kode}] ${item.nama}`} 
+                label={item.nama} 
                 value={item.nama} 
               />
             ))}
