@@ -85,16 +85,21 @@ const BerandaScreen = () => {
   );
 };
 
-// --- LAYAR MANAJEMEN BARANG MASTER (BARU) ---
+// --- LAYAR MANAJEMEN BARANG MASTER (DENGAN CRUD LENGKAP) ---
 const ManajemenBarangScreen = () => {
   const [listBarang, setListBarang] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // State input
+  // State untuk form input Tambah Barang
   const [kodeBarang, setKodeBarang] = useState('');
   const [namaBaru, setNamaBaru] = useState('');
   const [satuan, setSatuan] = useState('');
-  const daftarSatuan = ['PCS', 'BOX', 'PACK', 'ROLL', 'LEMBAR', 'RIM'];
+  
+  // State untuk fitur EDIT (Update)
+  const [modalEditVisible, setModalEditVisible] = useState(false);
+  const [itemYangDiedit, setItemYangDiedit] = useState<any>(null);
+  const [namaEdit, setNamaEdit] = useState('');
+  const [satuanEdit, setSatuanEdit] = useState('');
 
   // Fungsi untuk menghasilkan Kode Barang Otomatis (STM-1, STM-2, dst.)
   const generateKodeOtomatis = (dataBarang: any[]) => {
@@ -118,7 +123,7 @@ const ManajemenBarangScreen = () => {
     setKodeBarang(kodeBerikutnya);
   };
 
-  // Ambil data master barang dari koleksi 'barangMaster' di Firebase
+  // READ: Ambil data master barang dari Firebase
   const fetchBarangMaster = async () => {
     try {
       setLoading(true);
@@ -135,8 +140,6 @@ const ManajemenBarangScreen = () => {
         });
       });
       setListBarang(tempData);
-      
-      // Buat kode otomatis berdasarkan data terbaru yang ditarik
       generateKodeOtomatis(tempData);
     } catch (error) {
       console.error("Gagal mengambil data barang: ", error);
@@ -150,7 +153,7 @@ const ManajemenBarangScreen = () => {
     fetchBarangMaster();
   }, []);
 
-  // Tambah barang master baru ke Firebase
+  // CREATE: Tambah barang master baru ke Firebase
   const handleTambahBarangMaster = async () => {
     if (!namaBaru.trim() || !kodeBarang.trim()) {
       Alert.alert('Peringatan', 'Nama Barang wajib diisi!');
@@ -166,9 +169,7 @@ const ManajemenBarangScreen = () => {
         tanggalDibuat: new Date().toISOString(),
       });
 
-      Alert.alert('Sukses', `Barang "${namaBaru}" (${kodeBarang}) berhasil ditambahkan!`);
-      
-      // Reset form dan generate kode otomatis berikutnya
+      Alert.alert('Sukses', `Barang "${namaBaru}" berhasil ditambahkan!`);
       setNamaBaru('');
       setSatuan('');
       fetchBarangMaster(); 
@@ -178,12 +179,89 @@ const ManajemenBarangScreen = () => {
     }
   };
 
+  // UPDATE: Membuka Modal Edit dan mengisi data lama
+  const handleBukaModalEdit = (item: any) => {
+    setItemYangDiedit(item);
+    setNamaEdit(item.nama);
+    setSatuanEdit(item.satuan);
+    setModalEditVisible(true);
+  };
+
+  // UPDATE: Menyimpan perubahan data ke Firebase
+  const handleSimpanEdit = async () => {
+    if (!namaEdit.trim()) {
+      Alert.alert('Peringatan', 'Nama barang tidak boleh kosong!');
+      return;
+    }
+
+    try {
+      const docRef = doc(db, 'barangMaster', itemYangDiedit.id);
+      
+      await updateDoc(docRef, {
+        namaBarang: namaEdit.trim(),
+        satuan: satuanEdit,
+      });
+
+      Alert.alert('Sukses', 'Data barang berhasil diperbarui!');
+      setModalEditVisible(false);
+      fetchBarangMaster();
+    } catch (error: any) {
+      console.error("Gagal mengupdate: ", error);
+      Alert.alert('Error', `Gagal memperbarui: ${error.message}`);
+    }
+  };
+
+  // DELETE: Fungsi untuk Menghapus data dari Firebase
+  const handleDeleteItem = (item: any) => {
+    Alert.alert(
+      'Konfirmasi Hapus',
+      `Yakin ingin menghapus "${item.nama}" dari Master Barang? Data yang dihapus tidak bisa dikembalikan.`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Hapus',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const docRef = doc(db, 'barangMaster', item.id);
+              await deleteDoc(docRef);
+
+              Alert.alert('Sukses', 'Barang berhasil dihapus!');
+              fetchBarangMaster();
+            } catch (err: any) {
+              console.error("Gagal menghapus data: ", err);
+              Alert.alert('Error', `Gagal menghapus: ${err.message}`);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Tampilan per item pada daftar (FlatList)
   const renderItemBarang = ({ item }: { item: any }) => (
     <View style={styles.logCard}>
       <View style={styles.logHeader}>
         <Text style={[styles.badge, { backgroundColor: '#0056b3' }]}>Stok: {item.stok} {item.satuan}</Text>
       </View>
       <Text style={styles.logItemName}>[{item.kode}] {item.nama}</Text>
+
+      {/* Tombol Interaktif Edit & Hapus */}
+      <View style={styles.actionButtonContainer}>
+        <TouchableOpacity 
+          style={[styles.actionButton, { backgroundColor: '#ffc107', flex: 1, marginRight: 5 }]} 
+          onPress={() => handleBukaModalEdit(item)}
+        >
+          <Text style={styles.actionButtonText}>Edit</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1 }]} 
+          onPress={() => handleDeleteItem(item)}
+        >
+          <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Hapus</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -194,7 +272,6 @@ const ManajemenBarangScreen = () => {
       <ScrollView style={{ backgroundColor: '#FFF', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0' }} showsVerticalScrollIndicator={false}>
         <Text style={styles.label}>Tambah Jenis Barang Baru</Text>
         
-        {/* Kode Barang Otomatis */}
         <TextInput
           style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
           value={kodeBarang}
@@ -202,7 +279,6 @@ const ManajemenBarangScreen = () => {
           placeholder="Memuat kode..."
         />
 
-        {/* Nama Barang */}
         <TextInput
           style={styles.input}
           placeholder="Nama Barang..."
@@ -210,21 +286,12 @@ const ManajemenBarangScreen = () => {
           onChangeText={setNamaBaru}
         />
 
-        {/* Label untuk Pilihan Satuan */}
         <Text style={styles.label}>Pilih Satuan Barang:</Text>
         
-        {/* Komponen Dropdown Picker */}
-        <View style={{ 
-          backgroundColor: '#FFF', 
-          borderWidth: 1, 
-          borderColor: '#CCC', 
-          borderRadius: 8, 
-          marginBottom: 15,
-          overflow: 'hidden' 
-        }}>
+        <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden' }}>
           <Picker
             selectedValue={satuan}
-            onValueChange={(itemValue: string) => setSatuan(itemValue)} // <-- Ditambahkan tipe data ': string'
+            onValueChange={(itemValue: string) => setSatuan(itemValue)}
           >
             <Picker.Item label="PCS" value="PCS" />
             <Picker.Item label="BOX" value="BOX" />
@@ -240,7 +307,6 @@ const ManajemenBarangScreen = () => {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Daftar Master Barang */}
       <Text style={[styles.label, { marginBottom: 10 }]}>Daftar Inventaris Gudang:</Text>
       {loading ? (
         <Text style={styles.subtitle}>Memuat data...</Text>
@@ -254,6 +320,58 @@ const ManajemenBarangScreen = () => {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* MODAL UNTUK EDIT DATA BARANG */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalEditVisible}
+        onRequestClose={() => setModalEditVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.title}>Edit Master Barang</Text>
+            
+            <Text style={styles.label}>Nama Barang:</Text>
+            <TextInput
+              style={styles.input}
+              value={namaEdit}
+              onChangeText={setNamaEdit}
+              placeholder="Ubah nama barang..."
+            />
+
+            <Text style={styles.label}>Satuan:</Text>
+            <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden' }}>
+              <Picker
+                selectedValue={satuanEdit}
+                onValueChange={(itemValue: string) => setSatuanEdit(itemValue)}
+              >
+                <Picker.Item label="PCS" value="PCS" />
+                <Picker.Item label="BOX" value="BOX" />
+                <Picker.Item label="PACK" value="PACK" />
+                <Picker.Item label="ROLL" value="ROLL" />
+                <Picker.Item label="LEMBAR" value="LEMBAR" />
+                <Picker.Item label="RIM" value="RIM" />
+              </Picker>
+            </View>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} 
+                onPress={() => setModalEditVisible(false)}
+              >
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#28a745', flex: 1, marginLeft: 5, padding: 12 }]} 
+                onPress={handleSimpanEdit}
+              >
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Simpan</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -327,7 +445,7 @@ const BarangMasukScreen = () => {
   );
 };
 
-// --- (Bagian layar lainnya tetap sama seperti sebelumnya) ---
+// --- LAYAR BARANG KELUAR ---
 const BarangKeluarScreen = () => {
   const [namaBarang, setNamaBarang] = useState('');
   const [jumlah, setJumlah] = useState('');
@@ -877,7 +995,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#555',
   },
-  // --- Gaya Tambahan untuk Kartu Laporan yang Dicari TypeScript ---
   reportCard: {
     backgroundColor: '#FFF',
     padding: 20,
@@ -964,3 +1081,4 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 });
+
