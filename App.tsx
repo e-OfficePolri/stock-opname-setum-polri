@@ -8,6 +8,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { db } from './src/firebaseConfig';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
+// Fungsi bantuan untuk format tanggal YYYY-MM-DD
+const getTanggalHariIni = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // --- 1. LAYAR BERANDA ---
 const BerandaScreen = () => {
   const [stats, setStats] = useState({ totalMasuk: 0, totalKeluar: 0, sisaStok: 0 });
@@ -390,6 +399,8 @@ const ManajemenBarangScreen = () => {
 
 // --- 3. LAYAR BARANG MASUK ---
 const BarangMasukScreen = () => {
+  const [noDokumen, setNoDokumen] = useState('');
+  const [tanggalInput, setTanggalInput] = useState(getTanggalHariIni());
   const [namaBarang, setNamaBarang] = useState('');
   const [kodeTerpilih, setKodeTerpilih] = useState('');
   const [jumlah, setJumlah] = useState('');
@@ -398,7 +409,6 @@ const BarangMasukScreen = () => {
   const [listMaster, setListMaster] = useState<any[]>([]);
   const [masterLoading, setMasterLoading] = useState(true);
 
-  // State untuk pencarian
   const [modalSearchVisible, setModalSearchVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
 
@@ -440,7 +450,7 @@ const BarangMasukScreen = () => {
     setNamaBarang(item.nama);
     setKodeTerpilih(item.kode);
     setModalSearchVisible(false);
-    setSearchText(''); // reset pencarian
+    setSearchText('');
   };
 
   const filteredMaster = listMaster.filter(item => 
@@ -449,8 +459,8 @@ const BarangMasukScreen = () => {
   );
 
   const handleSimpanKeFirebase = async () => {
-    if (namaBarang.trim() === '' || jumlah.trim() === '') {
-      Alert.alert('Peringatan', 'Semua kolom harus diisi!');
+    if (noDokumen.trim() === '' || tanggalInput.trim() === '' || namaBarang.trim() === '' || jumlah.trim() === '') {
+      Alert.alert('Peringatan', 'Semua kolom bertanda wajib harus diisi!');
       return;
     }
 
@@ -458,13 +468,18 @@ const BarangMasukScreen = () => {
       setLoading(true);
       
       await addDoc(collection(db, 'barangMasuk'), {
+        noDokumen: noDokumen.trim(),
+        tanggal: tanggalInput.trim(),
         kodeBarang: kodeTerpilih,
         namaBarang: namaBarang,
         jumlah: Number(jumlah),
-        tanggal: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       });
 
-      Alert.alert('Sukses', `Barang ${namaBarang} berhasil disimpan ke Database Firebase!`);
+      Alert.alert('Sukses', `Barang ${namaBarang} dengan No. Dokumen ${noDokumen} berhasil disimpan!`);
+      
+      setNoDokumen('');
+      setTanggalInput(getTanggalHariIni());
       setJumlah('');
       setNamaBarang('');
       setKodeTerpilih('');
@@ -477,9 +492,25 @@ const BarangMasukScreen = () => {
   };
 
   return (
-    <View style={styles.formContainer}>
+    <ScrollView style={styles.logContainer} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>Input Barang Masuk (Firebase)</Text>
       
+      <Text style={styles.label}>No. Dokumen / No. Nota / Surmas:</Text>
+      <TextInput 
+        style={styles.input}
+        placeholder="Contoh: B/ND-102/IX/2026/Setum"
+        value={noDokumen}
+        onChangeText={setNoDokumen}
+      />
+
+      <Text style={styles.label}>Tanggal Dokumen (YYYY-MM-DD):</Text>
+      <TextInput 
+        style={styles.input}
+        placeholder="YYYY-MM-DD"
+        value={tanggalInput}
+        onChangeText={setTanggalInput}
+      />
+
       <Text style={styles.label}>Kode Barang:</Text>
       <TextInput 
         style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
@@ -512,7 +543,7 @@ const BarangMasukScreen = () => {
       />
 
       <TouchableOpacity 
-        style={[styles.button, loading && { backgroundColor: '#cccccc' }]} 
+        style={[styles.button, { marginBottom: 30 }, loading && { backgroundColor: '#cccccc' }]} 
         onPress={handleSimpanKeFirebase}
         disabled={loading || !namaBarang}
       >
@@ -562,12 +593,14 @@ const BarangMasukScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 };
 
 // --- 4. LAYAR BARANG KELUAR ---
 const BarangKeluarScreen = () => {
+  const [noDokumen, setNoDokumen] = useState('');
+  const [tanggalInput, setTanggalInput] = useState(getTanggalHariIni());
   const [namaBarang, setNamaBarang] = useState('');
   const [kodeTerpilih, setKodeTerpilih] = useState('');
   const [jumlah, setJumlah] = useState('');
@@ -577,7 +610,6 @@ const BarangKeluarScreen = () => {
   const [listMaster, setListMaster] = useState<any[]>([]);
   const [masterLoading, setMasterLoading] = useState(true);
 
-  // State untuk pencarian
   const [modalSearchVisible, setModalSearchVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
 
@@ -628,8 +660,8 @@ const BarangKeluarScreen = () => {
   );
 
   const handleSimpanKeluarKeFirebase = async () => {
-    if (namaBarang.trim() === '' || jumlah.trim() === '') {
-      Alert.alert('Peringatan', 'Nama barang dan jumlah wajib diisi!');
+    if (noDokumen.trim() === '' || tanggalInput.trim() === '' || namaBarang.trim() === '' || jumlah.trim() === '') {
+      Alert.alert('Peringatan', 'No. Dokumen, Tanggal, Nama Barang, dan Jumlah wajib diisi!');
       return;
     }
 
@@ -637,15 +669,19 @@ const BarangKeluarScreen = () => {
       setLoading(true);
       
       await addDoc(collection(db, 'barangKeluar'), {
+        noDokumen: noDokumen.trim(),
+        tanggal: tanggalInput.trim(),
         kodeBarang: kodeTerpilih,
         namaBarang: namaBarang,
         jumlah: Number(jumlah),
         keterangan: keterangan,
-        tanggal: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       });
 
-      Alert.alert('Sukses', `Barang Keluar: ${namaBarang} sejumlah ${jumlah} berhasil dicatat ke Database!`);
+      Alert.alert('Sukses', `Barang Keluar: ${namaBarang} sejumlah ${jumlah} berhasil dicatat!`);
       
+      setNoDokumen('');
+      setTanggalInput(getTanggalHariIni());
       setJumlah('');
       setKeterangan('');
       setNamaBarang('');
@@ -659,9 +695,25 @@ const BarangKeluarScreen = () => {
   };
 
   return (
-    <View style={styles.formContainer}>
+    <ScrollView style={styles.logContainer} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>Input Barang Keluar (Firebase)</Text>
       
+      <Text style={styles.label}>No. Dokumen / SPP / Bon Pengeluaran:</Text>
+      <TextInput 
+        style={styles.input}
+        placeholder="Contoh: SK/045/IX/2026/Setum"
+        value={noDokumen}
+        onChangeText={setNoDokumen}
+      />
+
+      <Text style={styles.label}>Tanggal Pengeluaran (YYYY-MM-DD):</Text>
+      <TextInput 
+        style={styles.input}
+        placeholder="YYYY-MM-DD"
+        value={tanggalInput}
+        onChangeText={setTanggalInput}
+      />
+
       <Text style={styles.label}>Kode Barang:</Text>
       <TextInput 
         style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
@@ -702,7 +754,7 @@ const BarangKeluarScreen = () => {
       />
 
       <TouchableOpacity 
-        style={[styles.button, { backgroundColor: '#d9534f' }, loading && { backgroundColor: '#cccccc' }]} 
+        style={[styles.button, { backgroundColor: '#d9534f', marginBottom: 30 }, loading && { backgroundColor: '#cccccc' }]} 
         onPress={handleSimpanKeluarKeFirebase}
         disabled={loading || !namaBarang}
       >
@@ -752,7 +804,7 @@ const BarangKeluarScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -775,10 +827,11 @@ const LogBarangScreen = () => {
         tempData.push({
           id: docItem.id,
           jenis: 'MASUK',
+          noDokumen: item.noDokumen || '-',
           nama: item.namaBarang,
           jumlah: item.jumlah,
           jumlahTampil: `${item.jumlah} Unit/Pcs`,
-          tanggal: item.tanggal ? item.tanggal.substring(0, 10) : 'Baru saja',
+          tanggal: item.tanggal || (item.createdAt ? item.createdAt.substring(0, 10) : '-'),
           koleksiAsal: 'barangMasuk',
         });
       });
@@ -789,10 +842,11 @@ const LogBarangScreen = () => {
         tempData.push({
           id: docItem.id,
           jenis: 'KELUAR',
+          noDokumen: item.noDokumen || '-',
           nama: item.namaBarang,
           jumlah: item.jumlah,
           jumlahTampil: `${item.jumlah} Unit/Pcs`,
-          tanggal: item.tanggal ? item.tanggal.substring(0, 10) : 'Baru saja',
+          tanggal: item.tanggal || (item.createdAt ? item.createdAt.substring(0, 10) : '-'),
           keterangan: item.keterangan,
           koleksiAsal: 'barangKeluar',
         });
@@ -876,6 +930,10 @@ const LogBarangScreen = () => {
         </Text>
         <Text style={styles.logDate}>{item.tanggal}</Text>
       </View>
+
+      <Text style={{ fontSize: 12, color: '#0056b3', fontWeight: 'bold', marginBottom: 2 }}>
+        No. Dok: {item.noDokumen}
+      </Text>
       
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <View style={{ flex: 1 }}>
