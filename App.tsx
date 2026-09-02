@@ -3,10 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Modal, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-// Import ikon dari Expo Vector Icons
 import { Ionicons } from '@expo/vector-icons';
 
-// Import objek database Firestore dari file konfigurasi kita
 import { db } from './src/firebaseConfig';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
@@ -400,6 +398,10 @@ const BarangMasukScreen = () => {
   const [listMaster, setListMaster] = useState<any[]>([]);
   const [masterLoading, setMasterLoading] = useState(true);
 
+  // State untuk pencarian
+  const [modalSearchVisible, setModalSearchVisible] = useState(false);
+  const [searchText, setSearchText] = useState('');
+
   const fetchMasterBarang = async () => {
     try {
       setMasterLoading(true);
@@ -415,7 +417,6 @@ const BarangMasukScreen = () => {
         });
       });
       
-      // Mengurutkan data master berdasarkan kode secara numerik (STM-1, STM-2, dst.)
       tempData.sort((a, b) => {
         const angkaA = parseInt(a.kode.replace('STM-', '')) || 0;
         const angkaB = parseInt(b.kode.replace('STM-', '')) || 0;
@@ -423,11 +424,6 @@ const BarangMasukScreen = () => {
       });
 
       setListMaster(tempData);
-      
-      if (tempData.length > 0) {
-        setNamaBarang(tempData[0].nama);
-        setKodeTerpilih(tempData[0].kode);
-      }
     } catch (error) {
       console.error("Gagal mengambil master barang: ", error);
       Alert.alert('Error', 'Gagal memuat daftar barang dari master.');
@@ -440,14 +436,17 @@ const BarangMasukScreen = () => {
     fetchMasterBarang();
   }, []);
 
-  // Fungsi saat pilihan dropdown berubah untuk memperbarui kode otomatis di atasnya
-  const handlePilihBarang = (nama: string) => {
-    setNamaBarang(nama);
-    const selectedItem = listMaster.find((item) => item.nama === nama);
-    if (selectedItem) {
-      setKodeTerpilih(selectedItem.kode);
-    }
+  const handlePilihBarang = (item: any) => {
+    setNamaBarang(item.nama);
+    setKodeTerpilih(item.kode);
+    setModalSearchVisible(false);
+    setSearchText(''); // reset pencarian
   };
+
+  const filteredMaster = listMaster.filter(item => 
+    item.nama.toLowerCase().includes(searchText.toLowerCase()) || 
+    item.kode.toLowerCase().includes(searchText.toLowerCase())
+  );
 
   const handleSimpanKeFirebase = async () => {
     if (namaBarang.trim() === '' || jumlah.trim() === '') {
@@ -467,6 +466,8 @@ const BarangMasukScreen = () => {
 
       Alert.alert('Sukses', `Barang ${namaBarang} berhasil disimpan ke Database Firebase!`);
       setJumlah('');
+      setNamaBarang('');
+      setKodeTerpilih('');
     } catch (error: any) {
       console.error("Gagal menyimpan data detail: ", error);
       Alert.alert('Error', `Gagal menyimpan: ${error.message}`);
@@ -484,31 +485,22 @@ const BarangMasukScreen = () => {
         style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
         value={kodeTerpilih}
         editable={false}
-        placeholder="Kode barang..."
+        placeholder="Pilih barang terlebih dahulu..."
       />
 
       <Text style={styles.label}>Pilih Nama Barang:</Text>
-      <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
-        {masterLoading ? (
-          <Text style={{ paddingHorizontal: 15, color: '#888' }}>Memuat daftar barang...</Text>
-        ) : listMaster.length === 0 ? (
-          <Text style={{ paddingHorizontal: 15, color: '#d9534f' }}>Master barang kosong. Tambah dulu!</Text>
-        ) : (
-          <Picker
-            selectedValue={namaBarang}
-            onValueChange={(itemValue: string) => handlePilihBarang(itemValue)}
-            style={{ fontSize: 16, color: '#333', borderWidth: 0, width: '100%', height: '100%', outline: 'none' } as any}
-          >
-            {listMaster.map((item) => (
-              <Picker.Item 
-                key={item.id} 
-                label={item.nama} 
-                value={item.nama} 
-              />
-            ))}
-          </Picker>
-        )}
-      </View>
+      <TouchableOpacity 
+        style={styles.dropdownSelector}
+        onPress={() => setModalSearchVisible(true)}
+        disabled={masterLoading || listMaster.length === 0}
+      >
+        <Text style={{ fontSize: 16, color: namaBarang ? '#333' : '#888' }}>
+          {masterLoading ? 'Memuat daftar barang...' : 
+           listMaster.length === 0 ? 'Master barang kosong. Tambah dulu!' : 
+           namaBarang ? namaBarang : 'Ketuk untuk mencari barang...'}
+        </Text>
+        <Ionicons name="chevron-down" size={20} color="#666" />
+      </TouchableOpacity>
 
       <Text style={styles.label}>Jumlah Masuk:</Text>
       <TextInput 
@@ -522,12 +514,54 @@ const BarangMasukScreen = () => {
       <TouchableOpacity 
         style={[styles.button, loading && { backgroundColor: '#cccccc' }]} 
         onPress={handleSimpanKeFirebase}
-        disabled={loading || listMaster.length === 0}
+        disabled={loading || !namaBarang}
       >
         <Text style={styles.buttonText}>
           {loading ? 'Menyimpan...' : 'Simpan ke Database'}
         </Text>
       </TouchableOpacity>
+
+      {/* Modal Pencarian Barang */}
+      <Modal visible={modalSearchVisible} animationType="slide" transparent={true} onRequestClose={() => setModalSearchVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '80%' }]}>
+            <Text style={styles.title}>Cari Barang</Text>
+            
+            <View style={styles.searchBarContainer}>
+              <Ionicons name="search" size={20} color="#888" style={{ marginRight: 10 }} />
+              <TextInput 
+                style={styles.searchInput}
+                placeholder="Ketik nama atau kode barang..."
+                value={searchText}
+                onChangeText={setSearchText}
+                autoFocus={true}
+              />
+            </View>
+
+            <FlatList 
+              data={filteredMaster}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              renderItem={({item}) => (
+                <TouchableOpacity style={styles.searchListItem} onPress={() => handlePilihBarang(item)}>
+                  <Text style={styles.searchListCode}>[{item.kode}]</Text>
+                  <Text style={styles.searchListName}>{item.nama}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={{ textAlign: 'center', marginTop: 20, color: '#888' }}>Barang tidak ditemukan.</Text>
+              }
+            />
+
+            <TouchableOpacity 
+              style={[styles.button, { backgroundColor: '#d9534f', marginTop: 15 }]} 
+              onPress={() => setModalSearchVisible(false)}
+            >
+              <Text style={styles.buttonText}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -542,6 +576,10 @@ const BarangKeluarScreen = () => {
   
   const [listMaster, setListMaster] = useState<any[]>([]);
   const [masterLoading, setMasterLoading] = useState(true);
+
+  // State untuk pencarian
+  const [modalSearchVisible, setModalSearchVisible] = useState(false);
+  const [searchText, setSearchText] = useState('');
 
   const fetchMasterBarang = async () => {
     try {
@@ -558,7 +596,6 @@ const BarangKeluarScreen = () => {
         });
       });
       
-      // Mengurutkan data master berdasarkan kode secara numerik (STM-1, STM-2, dst.)
       tempData.sort((a, b) => {
         const angkaA = parseInt(a.kode.replace('STM-', '')) || 0;
         const angkaB = parseInt(b.kode.replace('STM-', '')) || 0;
@@ -566,11 +603,6 @@ const BarangKeluarScreen = () => {
       });
 
       setListMaster(tempData);
-      
-      if (tempData.length > 0) {
-        setNamaBarang(tempData[0].nama);
-        setKodeTerpilih(tempData[0].kode);
-      }
     } catch (error) {
       console.error("Gagal mengambil master barang: ", error);
       Alert.alert('Error', 'Gagal memuat daftar barang dari master.');
@@ -583,13 +615,17 @@ const BarangKeluarScreen = () => {
     fetchMasterBarang();
   }, []);
 
-  const handlePilihBarang = (nama: string) => {
-    setNamaBarang(nama);
-    const selectedItem = listMaster.find((item) => item.nama === nama);
-    if (selectedItem) {
-      setKodeTerpilih(selectedItem.kode);
-    }
+  const handlePilihBarang = (item: any) => {
+    setNamaBarang(item.nama);
+    setKodeTerpilih(item.kode);
+    setModalSearchVisible(false);
+    setSearchText('');
   };
+
+  const filteredMaster = listMaster.filter(item => 
+    item.nama.toLowerCase().includes(searchText.toLowerCase()) || 
+    item.kode.toLowerCase().includes(searchText.toLowerCase())
+  );
 
   const handleSimpanKeluarKeFirebase = async () => {
     if (namaBarang.trim() === '' || jumlah.trim() === '') {
@@ -612,6 +648,8 @@ const BarangKeluarScreen = () => {
       
       setJumlah('');
       setKeterangan('');
+      setNamaBarang('');
+      setKodeTerpilih('');
     } catch (error: any) {
       console.error("Gagal menyimpan data barang keluar: ", error);
       Alert.alert('Error', `Gagal menyimpan: ${error.message}`);
@@ -629,31 +667,22 @@ const BarangKeluarScreen = () => {
         style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]}
         value={kodeTerpilih}
         editable={false}
-        placeholder="Kode barang..."
+        placeholder="Pilih barang terlebih dahulu..."
       />
 
       <Text style={styles.label}>Pilih Nama Barang:</Text>
-      <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
-        {masterLoading ? (
-          <Text style={{ paddingHorizontal: 15, color: '#888' }}>Memuat daftar barang...</Text>
-        ) : listMaster.length === 0 ? (
-          <Text style={{ paddingHorizontal: 15, color: '#d9534f' }}>Master barang kosong. Tambah dulu!</Text>
-        ) : (
-          <Picker
-            selectedValue={namaBarang}
-            onValueChange={(itemValue: string) => handlePilihBarang(itemValue)}
-            style={{ fontSize: 16, color: '#333', borderWidth: 0, width: '100%', height: '100%', outline: 'none' } as any}
-          >
-            {listMaster.map((item) => (
-              <Picker.Item 
-                key={item.id} 
-                label={item.nama} 
-                value={item.nama} 
-              />
-            ))}
-          </Picker>
-        )}
-      </View>
+      <TouchableOpacity 
+        style={styles.dropdownSelector}
+        onPress={() => setModalSearchVisible(true)}
+        disabled={masterLoading || listMaster.length === 0}
+      >
+        <Text style={{ fontSize: 16, color: namaBarang ? '#333' : '#888' }}>
+          {masterLoading ? 'Memuat daftar barang...' : 
+           listMaster.length === 0 ? 'Master barang kosong. Tambah dulu!' : 
+           namaBarang ? namaBarang : 'Ketuk untuk mencari barang...'}
+        </Text>
+        <Ionicons name="chevron-down" size={20} color="#666" />
+      </TouchableOpacity>
 
       <Text style={styles.label}>Jumlah Keluar:</Text>
       <TextInput 
@@ -675,12 +704,54 @@ const BarangKeluarScreen = () => {
       <TouchableOpacity 
         style={[styles.button, { backgroundColor: '#d9534f' }, loading && { backgroundColor: '#cccccc' }]} 
         onPress={handleSimpanKeluarKeFirebase}
-        disabled={loading || listMaster.length === 0}
+        disabled={loading || !namaBarang}
       >
         <Text style={styles.buttonText}>
           {loading ? 'Menyimpan...' : 'Simpan Barang Keluar'}
         </Text>
       </TouchableOpacity>
+
+      {/* Modal Pencarian Barang */}
+      <Modal visible={modalSearchVisible} animationType="slide" transparent={true} onRequestClose={() => setModalSearchVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '80%' }]}>
+            <Text style={styles.title}>Cari Barang Keluar</Text>
+            
+            <View style={styles.searchBarContainer}>
+              <Ionicons name="search" size={20} color="#888" style={{ marginRight: 10 }} />
+              <TextInput 
+                style={styles.searchInput}
+                placeholder="Ketik nama atau kode barang..."
+                value={searchText}
+                onChangeText={setSearchText}
+                autoFocus={true}
+              />
+            </View>
+
+            <FlatList 
+              data={filteredMaster}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              renderItem={({item}) => (
+                <TouchableOpacity style={styles.searchListItem} onPress={() => handlePilihBarang(item)}>
+                  <Text style={styles.searchListCode}>[{item.kode}]</Text>
+                  <Text style={styles.searchListName}>{item.nama}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={{ textAlign: 'center', marginTop: 20, color: '#888' }}>Barang tidak ditemukan.</Text>
+              }
+            />
+
+            <TouchableOpacity 
+              style={[styles.button, { backgroundColor: '#d9534f', marginTop: 15 }]} 
+              onPress={() => setModalSearchVisible(false)}
+            >
+              <Text style={styles.buttonText}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1053,178 +1124,42 @@ export default function App() {
 
 // --- PENGATURAN TAMPILAN (STYLING) ---
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    backgroundColor: '#F5F5F5', 
-    padding: 20 
-  },
-  formContainer: { 
-    flex: 1, 
-    padding: 20, 
-    backgroundColor: '#F5F5F5', 
-    justifyContent: 'center' 
-  },
-  logContainer: { 
-    flex: 1, 
-    padding: 20, 
-    backgroundColor: '#F5F5F5' 
-  },
-  title: { 
-    fontSize: 22, 
-    fontWeight: 'bold', 
-    marginBottom: 20, 
-    color: '#333', 
-    textAlign: 'center' 
-  },
-  subtitle: { 
-    fontSize: 16, 
-    color: '#666', 
-    textAlign: 'center' 
-  },
-  label: { 
-    fontSize: 16, 
-    marginBottom: 5, 
-    fontWeight: '600', 
-    color: '#444' 
-  },
-  input: { 
-    backgroundColor: '#FFF', 
-    borderWidth: 1, 
-    borderColor: '#CCC', 
-    borderRadius: 8, 
-    padding: 12, 
-    marginBottom: 15, 
-    fontSize: 16 
-  },
-  button: { 
-    backgroundColor: '#0056b3', 
-    padding: 15, 
-    borderRadius: 8, 
-    alignItems: 'center', 
-    marginTop: 10 
-  },
-  buttonText: { 
-    color: '#FFF', 
-    fontSize: 16, 
-    fontWeight: 'bold' 
-  },
-  logCard: {
-    backgroundColor: '#FFF',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  logHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-  badge: {
-    color: '#FFF',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    fontSize: 12,
-    fontWeight: 'bold',
-    overflow: 'hidden',
-  },
-  logDate: {
-    color: '#888',
-    fontSize: 12,
-  },
-  logItemName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 3,
-  },
-  logDetail: {
-    fontSize: 14,
-    color: '#555',
-  },
-  reportCard: {
-    backgroundColor: '#FFF',
-    padding: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    marginBottom: 20,
-  },
-  reportCardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  reportText: {
-    fontSize: 16,
-    color: '#555',
-    marginBottom: 8,
-  },
-  statCard: {
-    backgroundColor: '#FFF',
-    padding: 20,
-    borderRadius: 8,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderLeftWidth: 6,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    marginBottom: 5,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  statDesc: {
-    fontSize: 12,
-    color: '#888',
-  },
-  actionButtonContainer: {
-    flexDirection: 'row',
-    marginTop: 12,
-  },
-  actionButton: {
-    padding: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#FFF',
-    borderRadius: 10,
-    padding: 20,
-    width: '100%',
-    maxWidth: 400,
-    elevation: 5,
-  },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5', padding: 20 },
+  formContainer: { flex: 1, padding: 20, backgroundColor: '#F5F5F5', justifyContent: 'center' },
+  logContainer: { flex: 1, padding: 20, backgroundColor: '#F5F5F5' },
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#333', textAlign: 'center' },
+  subtitle: { fontSize: 16, color: '#666', textAlign: 'center' },
+  label: { fontSize: 16, marginBottom: 5, fontWeight: '600', color: '#444' },
+  input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, padding: 12, marginBottom: 15, fontSize: 16 },
+  button: { backgroundColor: '#0056b3', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  buttonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+  
+  // Custom Dropdown & Search Styles
+  dropdownSelector: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, padding: 15, marginBottom: 15 },
+  searchBarContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F0F0', borderRadius: 8, paddingHorizontal: 12, marginBottom: 15, borderWidth: 1, borderColor: '#DDD' },
+  searchInput: { flex: 1, height: 45, fontSize: 16, outlineStyle: 'none' } as any,
+  searchListItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#EEE', flexDirection: 'row', alignItems: 'center' },
+  searchListCode: { fontWeight: 'bold', color: '#0056b3', marginRight: 8, width: 65 },
+  searchListName: { fontSize: 16, color: '#333', flex: 1 },
+
+  logCard: { backgroundColor: '#FFF', padding: 15, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#E0E0E0' },
+  logHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
+  badge: { color: '#FFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, fontSize: 12, fontWeight: 'bold', overflow: 'hidden' },
+  logDate: { color: '#888', fontSize: 12 },
+  logItemName: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 3 },
+  logDetail: { fontSize: 14, color: '#555' },
+  reportCard: { backgroundColor: '#FFF', padding: 20, borderRadius: 8, borderWidth: 1, borderColor: '#E0E0E0', marginBottom: 20 },
+  reportCardTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 10 },
+  reportText: { fontSize: 16, color: '#555', marginBottom: 8 },
+  statCard: { backgroundColor: '#FFF', padding: 20, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0', borderLeftWidth: 6 },
+  statLabel: { fontSize: 14, color: '#666', fontWeight: '600', textTransform: 'uppercase', marginBottom: 5 },
+  statValue: { fontSize: 28, fontWeight: 'bold', marginBottom: 5 },
+  statDesc: { fontSize: 12, color: '#888' },
+  actionButtonContainer: { flexDirection: 'row', marginTop: 12 },
+  actionButton: { padding: 8, borderRadius: 6, alignItems: 'center' },
+  actionButtonText: { fontSize: 12, fontWeight: 'bold', color: '#333' },
+  iconButton: { width: 36, height: 36, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)', padding: 20 },
+  modalContent: { backgroundColor: '#FFF', borderRadius: 10, padding: 20, width: '100%', maxWidth: 400, elevation: 5 },
 });
 
