@@ -13,7 +13,6 @@ const BerandaScreen = () => {
   const [stats, setStats] = useState({ totalMasuk: 0, totalKeluar: 0, sisaStok: 0 });
   const [loading, setLoading] = useState(true);
 
-  // Fungsi untuk mengambil data dan menghitung statistik secara real-time
   const fetchStatistik = async () => {
     try {
       setLoading(true);
@@ -87,7 +86,7 @@ const ManajemenBarangScreen = () => {
   
   const [kodeBarang, setKodeBarang] = useState('');
   const [namaBaru, setNamaBaru] = useState('');
-  const [satuan, setSatuan] = useState('PCS'); // Default diset ke PCS huruf besar
+  const [satuan, setSatuan] = useState('PCS'); 
   
   const [modalEditVisible, setModalEditVisible] = useState(false);
   const [itemYangDiedit, setItemYangDiedit] = useState<any>(null);
@@ -131,12 +130,10 @@ const ManajemenBarangScreen = () => {
         });
       });
 
-      // --- LOGIKA SORTING (MENGURUTKAN) BERDASARKAN ANGKA KODE BARANG ---
       tempData.sort((a, b) => {
-        // Mengambil angka dari "STM-1", "STM-2", dst.
         const angkaA = parseInt(a.kode.replace('STM-', '')) || 0;
         const angkaB = parseInt(b.kode.replace('STM-', '')) || 0;
-        return angkaA - angkaB; // Urutkan dari terkecil ke terbesar
+        return angkaA - angkaB; 
       });
 
       setListBarang(tempData);
@@ -170,7 +167,7 @@ const ManajemenBarangScreen = () => {
 
       Alert.alert('Sukses', `Barang "${namaBaru}" berhasil ditambahkan!`);
       setNamaBaru('');
-      setSatuan('PCS'); // Kembalikan default ke PCS
+      setSatuan('PCS'); 
       fetchBarangMaster(); 
     } catch (error: any) {
       console.error("Gagal menambah barang: ", error);
@@ -237,7 +234,6 @@ const ManajemenBarangScreen = () => {
   const renderItemBarang = ({ item }: { item: any }) => (
     <View style={styles.logCard}>
       <View style={styles.logHeader}>
-        {/* --- MENGUBAH SATUAN MENJADI HURUF BESAR SEMUA DENGAN .toUpperCase() --- */}
         <Text style={[styles.badge, { backgroundColor: '#0056b3' }]}>
           Stok: {item.stok} {item.satuan.toUpperCase()}
         </Text>
@@ -288,11 +284,13 @@ const ManajemenBarangScreen = () => {
 
         <Text style={styles.label}>Pilih Satuan Barang:</Text>
         
-        {/* --- PERBAIKAN UKURAN PICKER: Menambahkan height: 54 dan justifyContent --- */}
         <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
+          {/* --- PERBAIKAN UKURAN FONT PADA PICKER DI SINI --- */}
           <Picker
             selectedValue={satuan}
             onValueChange={(itemValue: string) => setSatuan(itemValue)}
+            style={{ fontSize: 16, color: '#333', borderWidth: 0, width: '100%', height: '100%', outline: 'none' } as any}
+            itemStyle={{ fontSize: 16 }}
           >
             <Picker.Item label="PCS" value="PCS" />
             <Picker.Item label="BOX" value="BOX" />
@@ -345,11 +343,13 @@ const ManajemenBarangScreen = () => {
             />
 
             <Text style={styles.label}>Satuan:</Text>
-            {/* --- PERBAIKAN UKURAN PICKER DI DALAM MODAL --- */}
             <View style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CCC', borderRadius: 8, marginBottom: 15, overflow: 'hidden', height: 54, justifyContent: 'center' }}>
+              {/* --- PERBAIKAN UKURAN FONT PADA PICKER DI MODAL JUGA DI SINI --- */}
               <Picker
                 selectedValue={satuanEdit}
                 onValueChange={(itemValue: string) => setSatuanEdit(itemValue)}
+                style={{ fontSize: 16, color: '#333', borderWidth: 0, width: '100%', height: '100%', outline: 'none' } as any}
+                itemStyle={{ fontSize: 16 }}
               >
                 <Picker.Item label="PCS" value="PCS" />
                 <Picker.Item label="BOX" value="BOX" />
@@ -1067,3 +1067,4 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 });
+
