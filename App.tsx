@@ -425,7 +425,7 @@ const ManajemenBarangScreen = () => {
   );
 };
 
-// --- 3. LAYAR BARANG MASUK (DENGAN KERANJANG & EDIT LANJUTAN) ---
+// --- 3. LAYAR BARANG MASUK (DENGAN TOMBOL EDIT BARANG DI SAMPING HAPUS) ---
 const BarangMasukScreen = () => {
   const [noDokumen, setNoDokumen] = useState('');
   const [tanggalInput, setTanggalInput] = useState(getTanggalHariIni());
@@ -461,7 +461,7 @@ const BarangMasukScreen = () => {
   // State pencarian barang khusus untuk Modal Edit (tambah atau ubah barang)
   const [modalSearchEditVisible, setModalSearchEditVisible] = useState(false);
   const [searchEditText, setSearchEditText] = useState('');
-  const [editIndexTarget, setEditIndexTarget] = useState<number | null>(null); // Menandakan apakah sedang ganti barang atau tambah baru
+  const [editIndexTarget, setEditIndexTarget] = useState<number | null>(null);
 
   const [modalHapusDbVisible, setModalHapusDbVisible] = useState(false);
   const [itemHapusDb, setItemHapusDb] = useState<any>(null);
@@ -475,7 +475,7 @@ const BarangMasukScreen = () => {
         const item = docItem.data();
         tempData.push({ id: docItem.id, nama: item.namaBarang, kode: item.kodeBarang || '-' });
       });
-      tempData.sort((a, b) => a.nama.localeCompare(b.nama)); // Urutkan abjad master
+      tempData.sort((a, b) => a.nama.localeCompare(b.nama));
       setListMaster(tempData);
     } catch (error) {
       Alert.alert('Error', 'Gagal memuat daftar barang.');
@@ -598,7 +598,7 @@ const BarangMasukScreen = () => {
         return acc;
       }, {});
 
-      // Urutkan item di dalam masing-masing dokumen sesuai urutan awal input / createdAt
+      // Pertahankan urutan item sesuai urutan awal input (createdAt)
       Object.values(groupedData).forEach((group: any) => {
         group.items.sort((a: any, b: any) => {
           if (a.createdAt && b.createdAt) {
@@ -633,17 +633,14 @@ const BarangMasukScreen = () => {
     setEditItemsList(updatedItems);
   };
 
-  // Pilih barang dari master untuk dimasukkan atau diganti di mode edit
   const handlePilihBarangDariMasterEdit = (itemMaster: any) => {
     if (editIndexTarget !== null) {
-      // Mode Ganti Barang yang sudah ada
       const updatedItems = [...editItemsList];
       updatedItems[editIndexTarget].kodeBarang = itemMaster.kode;
       updatedItems[editIndexTarget].namaBarang = itemMaster.nama;
       setEditItemsList(updatedItems);
       setEditIndexTarget(null);
     } else {
-      // Mode Tambah Barang Baru ke List Edit
       const newItem = {
         id: null, 
         kodeBarang: itemMaster.kode,
@@ -935,15 +932,26 @@ const BarangMasukScreen = () => {
               
               {editItemsList.map((item, index) => (
                 <View key={index} style={{ backgroundColor: '#f8f9fa', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#ddd' }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                    <TouchableOpacity style={{ flex: 1, marginRight: 10 }} onPress={() => { setEditIndexTarget(index); setModalSearchEditVisible(true); }}>
-                      <Text style={{ fontWeight: 'bold', color: '#0056b3', textDecorationLine: 'underline' }}>
-                        [{item.kodeBarang}] {item.namaBarang} (Ketuk untuk Ganti)
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleHapusItemDariEdit(index)}>
-                      <Ionicons name="trash-outline" size={18} color="#d9534f" />
-                    </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={{ fontWeight: 'bold', color: '#333', flex: 1, marginRight: 10 }}>
+                      [{item.kodeBarang}] {item.namaBarang}
+                    </Text>
+                    
+                    {/* Tombol Aksi Edit & Hapus di samping satu sama lain */}
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TouchableOpacity 
+                        style={[styles.iconButton, { backgroundColor: '#ffc107', width: 28, height: 28, borderRadius: 4, justifyContent: 'center', alignItems: 'center' }]} 
+                        onPress={() => { setEditIndexTarget(index); setModalSearchEditVisible(true); }}
+                      >
+                        <Ionicons name="pencil-outline" size={16} color="#333" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.iconButton, { backgroundColor: '#d9534f', width: 28, height: 28, borderRadius: 4, justifyContent: 'center', alignItems: 'center' }]} 
+                        onPress={() => handleHapusItemDariEdit(index)}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   
                   <Text style={styles.label}>Jumlah:</Text>
