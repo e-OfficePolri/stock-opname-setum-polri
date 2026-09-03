@@ -554,17 +554,17 @@ const BarangMasukScreen = () => {
       Alert.alert('Peringatan', 'No. Dokumen dan Tanggal wajib diisi!');
       return;
     }
-
+  
     if (keranjang.length === 0) {
-      Alert.alert('Peringatan', 'Keranjang masih kosong. Tambahkan minimal satu barang!');
+      Alert.alert('Peringatan', 'Keranjang masih kosong!');
       return;
     }
-
+  
     try {
       setLoading(true);
-
+  
       for (let item of keranjang) {
-        // 1. Simpan riwayat transaksi ke koleksi barangMasuk
+        // 1. Simpan data transaksi ke koleksi barangMasuk
         await addDoc(collection(db, 'barangMasuk'), {
           noDokumen: noDokumen.trim(),
           tanggal: tanggalInput.trim(),
@@ -574,15 +574,15 @@ const BarangMasukScreen = () => {
           keterangan: item.keterangan,
           createdAt: new Date().toISOString(),
         });
-
-        // 2. Cari dokumen barang terkait di koleksi barangMaster berdasarkan kodeBarang
+  
+        // 2. Cari dokumen master berdasarkan kodeBarang
         const qMaster = query(
           collection(db, 'barangMaster'), 
           where('kodeBarang', '==', item.kodeBarang)
         );
         const querySnapshotMaster = await getDocs(qMaster);
-
-        // 3. Update field stokAwal pada barangMaster menggunakan increment()
+  
+        // 3. Tambahkan jumlah barang ke stokAwal master
         for (let docMaster of querySnapshotMaster.docs) {
           const masterRef = doc(db, 'barangMaster', docMaster.id);
           await updateDoc(masterRef, {
@@ -590,19 +590,13 @@ const BarangMasukScreen = () => {
           });
         }
       }
-
-      Alert.alert('Sukses', `Semua barang masuk dengan No. Dokumen ${noDokumen} berhasil dicatat dan stok master diperbarui!`);
-      
-      // Reset Form Keranjang
+  
+      Alert.alert('Sukses', 'Barang masuk berhasil disimpan dan stok master bertambah!');
       setNoDokumen('');
       setTanggalInput(getTanggalHariIni());
       setKeranjang([]);
-      
-      // Segarkan riwayat tabel barang masuk
       fetchBarangMasuk();
-
     } catch (error: any) {
-      console.error("Gagal menyimpan data barang masuk: ", error);
       Alert.alert('Error', `Gagal menyimpan: ${error.message}`);
     } finally {
       setLoading(false);
@@ -1294,33 +1288,49 @@ const BarangKeluarScreen = () => {
       Alert.alert('Peringatan', 'No. Dokumen dan Tanggal wajib diisi!');
       return;
     }
-
+  
     if (keranjang.length === 0) {
-      Alert.alert('Peringatan', 'Keranjang masih kosong. Tambahkan minimal satu barang!');
+      Alert.alert('Peringatan', 'Keranjang masih kosong!');
       return;
     }
-
+  
     try {
       setLoading(true);
+  
       for (let item of keranjang) {
+        // 1. Simpan data transaksi ke koleksi barangKeluar
         await addDoc(collection(db, 'barangKeluar'), {
           noDokumen: noDokumen.trim(),
           tanggal: tanggalInput.trim(),
           kodeBarang: item.kodeBarang,
           namaBarang: item.namaBarang,
-          jumlah: item.jumlah,
+          jumlah: Number(item.jumlah),
           keterangan: item.keterangan,
           createdAt: new Date().toISOString(),
         });
+  
+        // 2. Cari dokumen master berdasarkan kodeBarang
+        const qMaster = query(
+          collection(db, 'barangMaster'), 
+          where('kodeBarang', '==', item.kodeBarang)
+        );
+        const querySnapshotMaster = await getDocs(qMaster);
+  
+        // 3. Kurangi jumlah barang dari stokAwal master
+        for (let docMaster of querySnapshotMaster.docs) {
+          const masterRef = doc(db, 'barangMaster', docMaster.id);
+          await updateDoc(masterRef, {
+            stokAwal: increment(-Number(item.jumlah))
+          });
+        }
       }
-
-      Alert.alert('Sukses', `Semua barang keluar dengan No. Dokumen ${noDokumen} berhasil dicatat!`);
+  
+      Alert.alert('Sukses', 'Barang keluar berhasil disimpan dan stok master berkurang!');
       setNoDokumen('');
       setTanggalInput(getTanggalHariIni());
       setKeranjang([]);
       fetchBarangKeluar();
     } catch (error: any) {
-      console.error("Gagal menyimpan data barang keluar: ", error);
       Alert.alert('Error', `Gagal menyimpan: ${error.message}`);
     } finally {
       setLoading(false);
