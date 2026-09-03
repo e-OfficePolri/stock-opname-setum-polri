@@ -102,6 +102,9 @@ const ManajemenBarangScreen = () => {
   const [namaEdit, setNamaEdit] = useState('');
   const [satuanEdit, setSatuanEdit] = useState('');
 
+  const [modalHapusVisible, setModalHapusVisible] = useState(false);
+  const [itemYangDihapus, setItemYangDihapus] = useState<any>(null);
+
   const generateKodeOtomatis = (dataBarang: any[]) => {
     if (dataBarang.length === 0) {
       setKodeBarang('STM-1');
@@ -214,62 +217,24 @@ const ManajemenBarangScreen = () => {
     }
   };
 
-  const handleDeleteItem = async (item: any) => {
-    // KODE PELACAK 1
-    console.log("1. Tombol hapus berhasil merespons klik untuk item:", item.nama);
+  const handleBukaModalHapus = (item: any) => {
+    setItemYangDihapus(item);
+    setModalHapusVisible(true);
+  };
 
-    if (Platform.OS === 'web') {
-      // KODE PELACAK 2
-      console.log("2. Sistem mendeteksi aplikasi berjalan di Web/Komputer");
+  const eksekusiHapusMaster = async () => {
+    if (!itemYangDihapus) return;
+    try {
+      // Hapus dokumen langsung dari koleksi 'barangMaster' di Firebase
+      const docRef = doc(db, 'barangMaster', itemYangDihapus.id);
+      await deleteDoc(docRef);
       
-      const setujuHapus = window.confirm(`Apakah Anda yakin ingin menghapus data "${item.nama}" (${item.jenis})?`);
-      
-      // KODE PELACAK 3
-      console.log("3. Apakah user klik OK?", setujuHapus);
-      
-      if (setujuHapus) {
-        try {
-          // KODE PELACAK 4
-          console.log("4. Memulai perintah hapus ke Firebase untuk ID:", item.id);
-          
-          const docRef = doc(db, item.koleksiAsal, item.id);
-          await deleteDoc(docRef);
-          
-          // KODE PELACAK 5
-          console.log("5. Data BERHASIL dihapus dari Firebase!");
-          window.alert('Sukses: Data berhasil dihapus dari database!');
-          fetchLogData(); 
-        } catch (err: any) {
-          console.error("Gagal menghapus data dari Firebase: ", err);
-          window.alert(`Error: Gagal menghapus: ${err.message}`);
-        }
-      } else {
-        console.log("User membatalkan penghapusan.");
-      }
-    } 
-    else {
-      // (Logika HP dibiarkan seperti sebelumnya)
-      Alert.alert(
-        'Konfirmasi Hapus',
-        `Apakah Anda yakin ingin menghapus data "${item.nama}" (${item.jenis})?`,
-        [
-          { text: 'Batal', style: 'cancel' },
-          {
-            text: 'Hapus',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                const docRef = doc(db, item.koleksiAsal, item.id);
-                await deleteDoc(docRef);
-                Alert.alert('Sukses', 'Data berhasil dihapus!');
-                fetchLogData();
-              } catch (err: any) {
-                Alert.alert('Error', `Gagal menghapus: ${err.message}`);
-              }
-            },
-          },
-        ]
-      );
+      setModalHapusVisible(false);
+      setItemYangDihapus(null);
+      fetchBarangMaster(); // Segarkan ulang daftar master barang
+    } catch (err: any) {
+      console.error("Gagal menghapus data dari Firebase: ", err);
+      Alert.alert('Error', `Gagal menghapus: ${err.message}`);
     }
   };
 
@@ -294,7 +259,7 @@ const ManajemenBarangScreen = () => {
 
           <TouchableOpacity 
             style={[styles.iconButton, { backgroundColor: '#d9534f' }]} 
-            onPress={() => handleDeleteItem(item)}
+            onPress={() => handleBukaModalHapus(item)}
           >
             <Ionicons name="trash-outline" size={18} color="#FFF" />
           </TouchableOpacity>
@@ -421,6 +386,36 @@ const ManajemenBarangScreen = () => {
                 onPress={handleSimpanEdit}
               >
                 <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Simpan</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Modal Konfirmasi Hapus Master Barang */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalHapusVisible}
+        onRequestClose={() => setModalHapusVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={[styles.title, { color: '#d9534f' }]}>Konfirmasi Hapus Permanen</Text>
+            <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center', color: '#333' }}>
+              Apakah Anda yakin ingin menghapus data master "{itemYangDihapus?.nama}" secara permanen?
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} 
+                onPress={() => setModalHapusVisible(false)}
+              >
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1, marginLeft: 5, padding: 12 }]} 
+                onPress={eksekusiHapusMaster}
+              >
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Ya, Hapus</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -770,6 +765,8 @@ const BarangKeluarScreen = () => {
   
   // Keranjang untuk barang keluar
   const [keranjang, setKeranjang] = useState<any[]>([]);
+  const [modalHapusVisible, setModalHapusVisible] = useState(false);
+  const [itemYangDihapus, setItemYangDihapus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   
   const [listMaster, setListMaster] = useState<any[]>([]);
@@ -845,8 +842,19 @@ const BarangKeluarScreen = () => {
     setKeterangan('');
   };
 
-  const handleHapusDariKeranjang = (id: string) => {
-    setKeranjang(keranjang.filter(item => item.id !== id));
+  // Fungsi untuk membuka kotak konfirmasi
+  const handleBukaModalHapus = (item: any) => {
+    setItemYangDihapus(item);
+    setModalHapusVisible(true);
+  };
+
+  // Fungsi untuk mengeksekusi penghapusan dari keranjang
+  const eksekusiHapusKeranjang = () => {
+    if (itemYangDihapus) {
+      setKeranjang(keranjang.filter(item => item.id !== itemYangDihapus.id));
+      setModalHapusVisible(false); // Tutup modal
+      setItemYangDihapus(null);    // Kosongkan data sementara
+    }
   };
 
   const handleSimpanKeluarSemuaKeFirebase = async () => {
@@ -973,7 +981,7 @@ const BarangKeluarScreen = () => {
             </View>
             <TouchableOpacity 
               style={[styles.iconButton, { backgroundColor: '#d9534f' }]} 
-              onPress={() => handleHapusDariKeranjang(item.id)}
+              onPress={() => handleBukaModalHapus(item)}
             >
               <Ionicons name="trash-outline" size={16} color="#FFF" />
             </TouchableOpacity>
@@ -1029,6 +1037,36 @@ const BarangKeluarScreen = () => {
             >
               <Text style={styles.buttonText}>Tutup</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {/* Modal Konfirmasi Hapus Keranjang */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalHapusVisible}
+        onRequestClose={() => setModalHapusVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={[styles.title, { color: '#d9534f' }]}>Konfirmasi Hapus</Text>
+            <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center', color: '#333' }}>
+              Apakah Anda yakin ingin menghapus "{itemYangDihapus?.namaBarang}" dari daftar keluar?
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} 
+                onPress={() => setModalHapusVisible(false)}
+              >
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1, marginLeft: 5, padding: 12 }]} 
+                onPress={eksekusiHapusKeranjang}
+              >
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Ya, Hapus</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
