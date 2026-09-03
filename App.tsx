@@ -6,7 +6,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 
 import { db } from './src/firebaseConfig';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, increment } from 'firebase/firestore';
 
 // Fungsi bantuan untuk format tanggal YYYY-MM-DD
 const getTanggalHariIni = () => {
@@ -562,23 +562,45 @@ const BarangMasukScreen = () => {
 
     try {
       setLoading(true);
+
       for (let item of keranjang) {
+        // 1. Simpan riwayat transaksi ke koleksi barangMasuk
         await addDoc(collection(db, 'barangMasuk'), {
           noDokumen: noDokumen.trim(),
           tanggal: tanggalInput.trim(),
           kodeBarang: item.kodeBarang,
           namaBarang: item.namaBarang,
-          jumlah: item.jumlah,
+          jumlah: Number(item.jumlah),
           keterangan: item.keterangan,
           createdAt: new Date().toISOString(),
         });
+
+        // 2. Cari dokumen barang terkait di koleksi barangMaster berdasarkan kodeBarang
+        const qMaster = query(
+          collection(db, 'barangMaster'), 
+          where('kodeBarang', '==', item.kodeBarang)
+        );
+        const querySnapshotMaster = await getDocs(qMaster);
+
+        // 3. Update field stokAwal pada barangMaster menggunakan increment()
+        for (let docMaster of querySnapshotMaster.docs) {
+          const masterRef = doc(db, 'barangMaster', docMaster.id);
+          await updateDoc(masterRef, {
+            stokAwal: increment(Number(item.jumlah))
+          });
+        }
       }
 
-      Alert.alert('Sukses', `Semua barang masuk dengan No. Dokumen ${noDokumen} berhasil dicatat!`);
+      Alert.alert('Sukses', `Semua barang masuk dengan No. Dokumen ${noDokumen} berhasil dicatat dan stok master diperbarui!`);
+      
+      // Reset Form Keranjang
       setNoDokumen('');
       setTanggalInput(getTanggalHariIni());
       setKeranjang([]);
+      
+      // Segarkan riwayat tabel barang masuk
       fetchBarangMasuk();
+
     } catch (error: any) {
       console.error("Gagal menyimpan data barang masuk: ", error);
       Alert.alert('Error', `Gagal menyimpan: ${error.message}`);
@@ -586,7 +608,7 @@ const BarangMasukScreen = () => {
       setLoading(false);
     }
   };
-
+  
   const fetchBarangMasuk = async () => {
     try {
       setLoadingDataMasuk(true);
