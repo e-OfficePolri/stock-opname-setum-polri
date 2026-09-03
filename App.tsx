@@ -1193,6 +1193,38 @@ const LogBarangScreen = () => {
           </View>
         </View>
       </Modal>
+      {/* Modal Konfirmasi Hapus */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalHapusVisible}
+        onRequestClose={() => setModalHapusVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={[styles.title, { color: '#d9534f' }]}>Konfirmasi Hapus</Text>
+            
+            <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center', color: '#333' }}>
+              Apakah Anda yakin ingin menghapus riwayat "{itemYangDihapus?.nama}"? Tindakan ini tidak dapat dibatalkan.
+            </Text>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} 
+                onPress={() => setModalHapusVisible(false)}
+              >
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1, marginLeft: 5, padding: 12 }]} 
+                onPress={eksekusiHapus}
+              >
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Ya, Hapus</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
