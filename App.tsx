@@ -215,27 +215,40 @@ const ManajemenBarangScreen = () => {
   };
 
   const handleDeleteItem = async (item: any) => {
-    // 1. Logika khusus jika aplikasi dijalankan di Komputer (Web Browser)
+    // KODE PELACAK 1
+    console.log("1. Tombol hapus berhasil merespons klik untuk item:", item.nama);
+
     if (Platform.OS === 'web') {
-      // Menggunakan pop-up konfirmasi bawaan browser komputer
+      // KODE PELACAK 2
+      console.log("2. Sistem mendeteksi aplikasi berjalan di Web/Komputer");
+      
       const setujuHapus = window.confirm(`Apakah Anda yakin ingin menghapus data "${item.nama}" (${item.jenis})?`);
       
-      // Jika user klik "OK" di browser
+      // KODE PELACAK 3
+      console.log("3. Apakah user klik OK?", setujuHapus);
+      
       if (setujuHapus) {
         try {
+          // KODE PELACAK 4
+          console.log("4. Memulai perintah hapus ke Firebase untuk ID:", item.id);
+          
           const docRef = doc(db, item.koleksiAsal, item.id);
           await deleteDoc(docRef);
           
+          // KODE PELACAK 5
+          console.log("5. Data BERHASIL dihapus dari Firebase!");
           window.alert('Sukses: Data berhasil dihapus dari database!');
-          fetchLogData(); // Menyegarkan daftar log
+          fetchLogData(); 
         } catch (err: any) {
-          console.error("Gagal menghapus data: ", err);
+          console.error("Gagal menghapus data dari Firebase: ", err);
           window.alert(`Error: Gagal menghapus: ${err.message}`);
         }
+      } else {
+        console.log("User membatalkan penghapusan.");
       }
     } 
-    // 2. Logika asli jika aplikasi dijalankan di HP (Android/iOS)
     else {
+      // (Logika HP dibiarkan seperti sebelumnya)
       Alert.alert(
         'Konfirmasi Hapus',
         `Apakah Anda yakin ingin menghapus data "${item.nama}" (${item.jenis})?`,
@@ -248,11 +261,9 @@ const ManajemenBarangScreen = () => {
               try {
                 const docRef = doc(db, item.koleksiAsal, item.id);
                 await deleteDoc(docRef);
-
-                Alert.alert('Sukses', 'Data berhasil dihapus dari database!');
+                Alert.alert('Sukses', 'Data berhasil dihapus!');
                 fetchLogData();
               } catch (err: any) {
-                console.error("Gagal menghapus data: ", err);
                 Alert.alert('Error', `Gagal menghapus: ${err.message}`);
               }
             },
