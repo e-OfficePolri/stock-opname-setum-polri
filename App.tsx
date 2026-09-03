@@ -578,6 +578,8 @@ const BarangMasukScreen = () => {
       setNoDokumen('');
       setTanggalInput(getTanggalHariIni());
       setKeranjang([]);
+      // Refresh daftar transaksi setelah menyimpan
+      fetchBarangMasuk(); 
     } catch (error: any) {
       console.error("Gagal menyimpan data detail: ", error);
       Alert.alert('Error', `Gagal menyimpan: ${error.message}`);
@@ -585,6 +587,92 @@ const BarangMasukScreen = () => {
       setLoading(false);
     }
   };
+
+  // --- BAGIAN FUNGSI YANG SEBELUMNYA TERCECER DIPINDAHKAN KE SINI ---
+
+  // Fungsi mengambil riwayat barang masuk dari Firebase
+  const fetchBarangMasuk = async () => {
+    try {
+      setLoadingDataMasuk(true);
+      const querySnapshot = await getDocs(collection(db, 'barangMasuk'));
+      let tempData: any[] = [];
+      querySnapshot.forEach((docItem) => {
+        const item = docItem.data();
+        tempData.push({
+          id: docItem.id,
+          noDokumen: item.noDokumen || '-',
+          tanggal: item.tanggal || '-',
+          kodeBarang: item.kodeBarang || '-',
+          namaBarang: item.namaBarang || '-',
+          jumlah: item.jumlah || 0,
+          keterangan: item.keterangan || '-',
+        });
+      });
+      setListBarangMasuk(tempData);
+    } catch (error) {
+      console.error("Gagal memuat data barang masuk: ", error);
+    } finally {
+      setLoadingDataMasuk(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchBarangMasuk();
+  }, []);
+
+  // Fungsi Edit Data Masuk
+  const handleBukaEditMasuk = (item: any) => {
+    setItemEditMasuk(item);
+    setJumlahEdit(String(item.jumlah));
+    setKeteranganEdit(item.keterangan);
+    setModalEditMasukVisible(true);
+  };
+
+  const handleSimpanEditMasuk = async () => {
+    if (!jumlahEdit || Number(jumlahEdit) <= 0) {
+      Alert.alert('Peringatan', 'Jumlah harus valid!');
+      return;
+    }
+    try {
+      const docRef = doc(db, 'barangMasuk', itemEditMasuk.id);
+      await updateDoc(docRef, {
+        jumlah: Number(jumlahEdit),
+        keterangan: keteranganEdit.trim(),
+      });
+      Alert.alert('Sukses', 'Data barang masuk berhasil diperbarui!');
+      setModalEditMasukVisible(false);
+      fetchBarangMasuk();
+    } catch (error: any) {
+      Alert.alert('Error', `Gagal memperbarui: ${error.message}`);
+    }
+  };
+
+  // Fungsi Hapus Data dari Database
+  const handleBukaHapusDb = (item: any) => {
+    setItemHapusDb(item);
+    setModalHapusDbVisible(true);
+  };
+
+  const eksekusiHapusDb = async () => {
+    if (!itemHapusDb) return;
+    try {
+      const docRef = doc(db, 'barangMasuk', itemHapusDb.id);
+      await deleteDoc(docRef);
+      setModalHapusDbVisible(false);
+      setItemHapusDb(null);
+      fetchBarangMasuk();
+      Alert.alert('Sukses', 'Data berhasil dihapus dari database.');
+    } catch (error: any) {
+      Alert.alert('Error', `Gagal menghapus: ${error.message}`);
+    }
+  };
+
+  // Fungsi Simulasi Download Data
+  const handleDownloadData = () => {
+    Alert.alert('Unduh Data', 'Data rekapitulasi barang masuk berhasil diunduh dalam format laporan.');
+  };
+
+  // --- BATAS FUNGSI ---
 
   return (
     <ScrollView style={styles.logContainer} showsVerticalScrollIndicator={false}>
@@ -731,6 +819,7 @@ const BarangMasukScreen = () => {
           </View>
         </View>
       </Modal>
+      
       {/* Modal Konfirmasi Hapus Keranjang */}
       <Modal
         animationType="fade"
@@ -763,6 +852,7 @@ const BarangMasukScreen = () => {
           </View>
         </View>
       </Modal>
+
       {/* Tombol Download Laporan Data Masuk */}
       <TouchableOpacity 
         style={[styles.button, { backgroundColor: '#17a2b8', marginBottom: 20 }]} 
@@ -884,88 +974,6 @@ const BarangMasukScreen = () => {
     </ScrollView>
   );
 };
-
-// Fungsi mengambil riwayat barang masuk dari Firebase
-  const fetchBarangMasuk = async () => {
-    try {
-      setLoadingDataMasuk(true);
-      const querySnapshot = await getDocs(collection(db, 'barangMasuk'));
-      let tempData: any[] = [];
-      querySnapshot.forEach((docItem) => {
-        const item = docItem.data();
-        tempData.push({
-          id: docItem.id,
-          noDokumen: item.noDokumen || '-',
-          tanggal: item.tanggal || '-',
-          kodeBarang: item.kodeBarang || '-',
-          namaBarang: item.namaBarang || '-',
-          jumlah: item.jumlah || 0,
-          keterangan: item.keterangan || '-',
-        });
-      });
-      setListBarangMasuk(tempData);
-    } catch (error) {
-      console.error("Gagal memuat data barang masuk: ", error);
-    } finally {
-      setLoadingDataMasuk(false);
-    }
-  };
-
-  React.useEffect(() => {
-    fetchBarangMasuk();
-  }, []);
-
-  // Fungsi Edit Data Masuk
-  const handleBukaEditMasuk = (item: any) => {
-    setItemEditMasuk(item);
-    setJumlahEdit(String(item.jumlah));
-    setKeteranganEdit(item.keterangan);
-    setModalEditMasukVisible(true);
-  };
-
-  const handleSimpanEditMasuk = async () => {
-    if (!jumlahEdit || Number(jumlahEdit) <= 0) {
-      Alert.alert('Peringatan', 'Jumlah harus valid!');
-      return;
-    }
-    try {
-      const docRef = doc(db, 'barangMasuk', itemEditMasuk.id);
-      await updateDoc(docRef, {
-        jumlah: Number(jumlahEdit),
-        keterangan: keteranganEdit.trim(),
-      });
-      Alert.alert('Sukses', 'Data barang masuk berhasil diperbarui!');
-      setModalEditMasukVisible(false);
-      fetchBarangMasuk();
-    } catch (error: any) {
-      Alert.alert('Error', `Gagal memperbarui: ${error.message}`);
-    }
-  };
-
-  // Fungsi Hapus Data dari Database
-  const handleBukaHapusDb = (item: any) => {
-    setItemHapusDb(item);
-    setModalHapusDbVisible(true);
-  };
-
-  const eksekusiHapusDb = async () => {
-    if (!itemHapusDb) return;
-    try {
-      const docRef = doc(db, 'barangMasuk', itemHapusDb.id);
-      await deleteDoc(docRef);
-      setModalHapusDbVisible(false);
-      setItemHapusDb(null);
-      fetchBarangMasuk();
-      Alert.alert('Sukses', 'Data berhasil dihapus dari database.');
-    } catch (error: any) {
-      Alert.alert('Error', `Gagal menghapus: ${error.message}`);
-    }
-  };
-
-  // Fungsi Simulasi Download Data
-  const handleDownloadData = () => {
-    Alert.alert('Unduh Data', 'Data rekapitulasi barang masuk berhasil diunduh dalam format laporan.');
-  };
 
 // --- 4. LAYAR BARANG KELUAR (DENGAN KERANJANG) ---
 const BarangKeluarScreen = () => {
