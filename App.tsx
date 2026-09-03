@@ -1034,7 +1034,7 @@ const BarangMasukScreen = () => {
   );
 };
 
-// --- 4. LAYAR BARANG KELUAR (DENGAN KERANJANG) ---
+// --- 4. LAYAR BARANG KELUAR (LENGKAP DENGAN RIWAYAT, EDIT, & TOMBOL PENCARIAN ITEM) ---
 const BarangKeluarScreen = () => {
   const [noDokumen, setNoDokumen] = useState('');
   const [tanggalInput, setTanggalInput] = useState(getTanggalHariIni());
@@ -1044,7 +1044,6 @@ const BarangKeluarScreen = () => {
   const [jumlah, setJumlah] = useState('');
   const [keterangan, setKeterangan] = useState('');
   
-  // Keranjang untuk barang keluar
   const [keranjang, setKeranjang] = useState<any[]>([]);
   const [modalHapusVisible, setModalHapusVisible] = useState(false);
   const [itemYangDihapus, setItemYangDihapus] = useState<any>(null);
@@ -1055,6 +1054,29 @@ const BarangKeluarScreen = () => {
 
   const [modalSearchVisible, setModalSearchVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
+
+  // State Riwayat & Tabel Barang Keluar
+  const [listBarangKeluarGrouped, setListBarangKeluarGrouped] = useState<any[]>([]);
+  const [loadingDataKeluar, setLoadingDataKeluar] = useState(true);
+
+  // State Detail Dokumen
+  const [modalDetailVisible, setModalDetailVisible] = useState(false);
+  const [itemDetail, setItemDetail] = useState<any>(null);
+
+  // State Edit Dokumen & Item
+  const [modalEditVisible, setModalEditVisible] = useState(false);
+  const [editNoDokumen, setEditNoDokumen] = useState('');
+  const [editTanggal, setEditTanggal] = useState('');
+  const [editItemsList, setEditItemsList] = useState<any[]>([]);
+
+  // State Pencarian khusus Modal Edit (Tambah/Ganti Barang)
+  const [modalSearchEditVisible, setModalSearchEditVisible] = useState(false);
+  const [searchEditText, setSearchEditText] = useState('');
+  const [editIndexTarget, setEditIndexTarget] = useState<number | null>(null);
+
+  // State Hapus dari Database
+  const [modalHapusDbVisible, setModalHapusDbVisible] = useState(false);
+  const [itemHapusDb, setItemHapusDb] = useState<any>(null);
 
   const fetchMasterBarang = async () => {
     try {
@@ -1071,12 +1093,7 @@ const BarangKeluarScreen = () => {
         });
       });
       
-      tempData.sort((a, b) => {
-        const angkaA = parseInt(a.kode.replace('STM-', '')) || 0;
-        const angkaB = parseInt(b.kode.replace('STM-', '')) || 0;
-        return angkaA - angkaB; 
-      });
-
+      tempData.sort((a, b) => a.nama.localeCompare(b.nama));
       setListMaster(tempData);
     } catch (error) {
       console.error("Gagal mengambil master barang: ", error);
@@ -1102,6 +1119,11 @@ const BarangKeluarScreen = () => {
     item.kode.toLowerCase().includes(searchText.toLowerCase())
   );
 
+  const filteredMasterEdit = listMaster.filter(item => 
+    item.nama.toLowerCase().includes(searchEditText.toLowerCase()) || 
+    item.kode.toLowerCase().includes(searchEditText.toLowerCase())
+  );
+
   const handleTambahKeKeranjang = () => {
     if (!namaBarang || !jumlah || Number(jumlah) <= 0) {
       Alert.alert('Peringatan', 'Pilih nama barang dan masukkan jumlah keluar!');
@@ -1123,18 +1145,16 @@ const BarangKeluarScreen = () => {
     setKeterangan('');
   };
 
-  // Fungsi untuk membuka kotak konfirmasi
   const handleBukaModalHapus = (item: any) => {
     setItemYangDihapus(item);
     setModalHapusVisible(true);
   };
 
-  // Fungsi untuk mengeksekusi penghapusan dari keranjang
   const eksekusiHapusKeranjang = () => {
     if (itemYangDihapus) {
       setKeranjang(keranjang.filter(item => item.id !== itemYangDihapus.id));
-      setModalHapusVisible(false); // Tutup modal
-      setItemYangDihapus(null);    // Kosongkan data sementara
+      setModalHapusVisible(false);
+      setItemYangDihapus(null);
     }
   };
 
@@ -1151,7 +1171,6 @@ const BarangKeluarScreen = () => {
 
     try {
       setLoading(true);
-      
       for (let item of keranjang) {
         await addDoc(collection(db, 'barangKeluar'), {
           noDokumen: noDokumen.trim(),
@@ -1165,15 +1184,186 @@ const BarangKeluarScreen = () => {
       }
 
       Alert.alert('Sukses', `Semua barang keluar dengan No. Dokumen ${noDokumen} berhasil dicatat!`);
-      
       setNoDokumen('');
       setTanggalInput(getTanggalHariIni());
       setKeranjang([]);
+      fetchBarangKeluar();
     } catch (error: any) {
       console.error("Gagal menyimpan data barang keluar: ", error);
       Alert.alert('Error', `Gagal menyimpan: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBarangKeluar = async () => {
+    try {
+      setLoadingDataKeluar(true);
+      const querySnapshot = await getDocs(collection(db, 'barangKeluar'));
+      let tempData: any[] = [];
+      querySnapshot.forEach((docItem) => {
+        tempData.push({ id: docItem.id, ...docItem.data() });
+      });
+
+      const groupedData = tempData.reduce((acc: any, curr: any) => {
+        const noDok = curr.noDokumen || '-';
+        if (!acc[noDok]) {
+          acc[noDok] = {
+            noDokumen: noDok,
+            tanggal: curr.tanggal || '-',
+            totalItemTypes: 0,
+            totalJumlah: 0,
+            keteranganUtama: curr.keterangan || '-',
+            items: [],
+          };
+        }
+        acc[noDok].items.push(curr);
+        acc[noDok].totalItemTypes += 1;
+        acc[noDok].totalJumlah += Number(curr.jumlah) || 0;
+        
+        if ((!acc[noDok].keteranganUtama || acc[noDok].keteranganUtama === '-') && curr.keterangan) {
+          acc[noDok].keteranganUtama = curr.keterangan;
+        }
+
+        return acc;
+      }, {});
+
+      // Urutkan item di dalam grup sesuai urutan input awal (createdAt)
+      Object.values(groupedData).forEach((group: any) => {
+        group.items.sort((a: any, b: any) => {
+          if (a.createdAt && b.createdAt) {
+            return a.createdAt.localeCompare(b.createdAt);
+          }
+          return 0;
+        });
+      });
+
+      setListBarangKeluarGrouped(Object.values(groupedData));
+    } catch (error) {
+      console.error("Gagal memuat riwayat barang keluar:", error);
+    } finally {
+      setLoadingDataKeluar(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchBarangKeluar();
+  }, []);
+
+  const handleBukaEdit = (groupItem: any) => {
+    setEditNoDokumen(groupItem.noDokumen);
+    setEditTanggal(groupItem.tanggal);
+    setEditItemsList(JSON.parse(JSON.stringify(groupItem.items)));
+    setModalEditVisible(true);
+  };
+
+  const handleUbahItemEdit = (index: number, field: string, value: any) => {
+    const updatedItems = [...editItemsList];
+    updatedItems[index][field] = value;
+    setEditItemsList(updatedItems);
+  };
+
+  const handlePilihBarangDariMasterEdit = (itemMaster: any) => {
+    if (editIndexTarget !== null) {
+      const updatedItems = [...editItemsList];
+      updatedItems[editIndexTarget].kodeBarang = itemMaster.kode;
+      updatedItems[editIndexTarget].namaBarang = itemMaster.nama;
+      setEditItemsList(updatedItems);
+      setEditIndexTarget(null);
+    } else {
+      const newItem = {
+        id: null,
+        kodeBarang: itemMaster.kode,
+        namaBarang: itemMaster.nama,
+        jumlah: 1,
+        keterangan: '',
+        createdAt: new Date().toISOString(),
+      };
+      setEditItemsList([...editItemsList, newItem]);
+    }
+    setModalSearchEditVisible(false);
+    setSearchEditText('');
+  };
+
+  const handleHapusItemDariEdit = (index: number) => {
+    const updatedItems = editItemsList.filter((_, i) => i !== index);
+    setEditItemsList(updatedItems);
+  };
+
+  const handleSimpanEdit = async () => {
+    if (!editNoDokumen.trim() || !editTanggal.trim()) {
+      Alert.alert('Peringatan', 'Nomor dokumen dan tanggal wajib diisi!');
+      return;
+    }
+    if (editItemsList.length === 0) {
+      Alert.alert('Peringatan', 'Dokumen harus memiliki minimal 1 item barang!');
+      return;
+    }
+    try {
+      setLoading(true);
+      const groupAwal = listBarangKeluarGrouped.find(g => g.noDokumen === editNoDokumen);
+      
+      for (let item of editItemsList) {
+        if (item.id) {
+          const docRef = doc(db, 'barangKeluar', item.id);
+          await updateDoc(docRef, {
+            noDokumen: editNoDokumen.trim(),
+            tanggal: editTanggal.trim(),
+            namaBarang: item.namaBarang,
+            kodeBarang: item.kodeBarang,
+            jumlah: Number(item.jumlah) || 0,
+            keterangan: item.keterangan || '',
+          });
+        } else {
+          await addDoc(collection(db, 'barangKeluar'), {
+            noDokumen: editNoDokumen.trim(),
+            tanggal: editTanggal.trim(),
+            kodeBarang: item.kodeBarang,
+            namaBarang: item.namaBarang,
+            jumlah: Number(item.jumlah) || 0,
+            keterangan: item.keterangan || '',
+            createdAt: item.createdAt || new Date().toISOString(),
+          });
+        }
+      }
+
+      if (groupAwal && groupAwal.items) {
+        const currentIds = editItemsList.filter(i => i.id !== null).map(i => i.id);
+        for (let oldItem of groupAwal.items) {
+          if (!currentIds.includes(oldItem.id)) {
+            await deleteDoc(doc(db, 'barangKeluar', oldItem.id));
+          }
+        }
+      }
+
+      Alert.alert('Sukses', 'Perubahan data barang keluar berhasil disimpan.');
+      setModalEditVisible(false);
+      fetchBarangKeluar();
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBukaHapusDb = (groupItem: any) => {
+    setItemHapusDb(groupItem);
+    setModalHapusDbVisible(true);
+  };
+
+  const eksekusiHapusDb = async () => {
+    if (!itemHapusDb) return;
+    try {
+      for (let item of itemHapusDb.items) {
+        const docRef = doc(db, 'barangKeluar', item.id);
+        await deleteDoc(docRef);
+      }
+      setModalHapusDbVisible(false);
+      setItemHapusDb(null);
+      fetchBarangKeluar();
+      Alert.alert('Sukses', 'Dokumen barang keluar berhasil dihapus.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
     }
   };
 
@@ -1280,7 +1470,64 @@ const BarangKeluarScreen = () => {
         </Text>
       </TouchableOpacity>
 
-      {/* Modal Pencarian Barang */}
+      {/* --- TABEL RIWAYAT TRANSAKSI BARANG KELUAR --- */}
+      <View style={{ marginBottom: 40, width: '100%' }}>
+        <Text style={[styles.title, { fontSize: 18, textAlign: 'left', marginBottom: 10 }]}>
+          Riwayat Transaksi Keluar ({listBarangKeluarGrouped.length} Dokumen)
+        </Text>
+
+        {loadingDataKeluar ? (
+          <Text style={styles.subtitle}>Memuat riwayat...</Text>
+        ) : listBarangKeluarGrouped.length === 0 ? (
+          <Text style={styles.subtitle}>Belum ada riwayat barang keluar.</Text>
+        ) : (
+          <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
+            <View style={{ minWidth: '100%', width: '100%', backgroundColor: '#FFF', borderRadius: 8, borderWidth: 1, borderColor: '#ddd', overflow: 'hidden' }}>
+              
+              <View style={{ flexDirection: 'row', backgroundColor: '#f4f4f4', borderBottomWidth: 1, borderColor: '#ddd', paddingVertical: 12 }}>
+                <Text style={{ width: 50, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>NO.</Text>
+                <Text style={{ width: 120, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>TANGGAL</Text>
+                <Text style={{ flex: 2, minWidth: 200, paddingHorizontal: 10, fontWeight: 'bold', color: '#333' }}>NO. DOKUMEN</Text>
+                <Text style={{ width: 140, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>JML BARANG</Text>
+                <Text style={{ flex: 2, minWidth: 180, paddingHorizontal: 10, fontWeight: 'bold', color: '#333' }}>KETERANGAN</Text>
+                <Text style={{ width: 120, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>AKSI</Text>
+              </View>
+
+              {listBarangKeluarGrouped.map((row, index) => (
+                <View key={index} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#eee', paddingVertical: 12, alignItems: 'center' }}>
+                  <Text style={{ width: 50, textAlign: 'center', color: '#555' }}>{index + 1}</Text>
+                  <Text style={{ width: 120, textAlign: 'center', color: '#555' }}>{row.tanggal}</Text>
+                  <Text style={{ flex: 2, minWidth: 200, paddingHorizontal: 10, color: '#d9534f', fontWeight: 'bold' }}>{row.noDokumen}</Text>
+                  
+                  <View style={{ width: 140, alignItems: 'center' }}>
+                    <Text style={{ color: '#555', fontWeight: 'bold' }}>{row.totalItemTypes} Macam</Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>({row.totalJumlah} Unit)</Text>
+                  </View>
+
+                  <Text style={{ flex: 2, minWidth: 180, paddingHorizontal: 10, color: '#555', fontSize: 12 }} numberOfLines={1}>
+                    {row.keteranganUtama}
+                  </Text>
+                  
+                  <View style={{ width: 120, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+                    <TouchableOpacity style={[styles.iconButton, { backgroundColor: '#17a2b8' }]} onPress={() => { setItemDetail(row); setModalDetailVisible(true); }}>
+                      <Ionicons name="eye-outline" size={16} color="#FFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.iconButton, { backgroundColor: '#ffc107' }]} onPress={() => handleBukaEdit(row)}>
+                      <Ionicons name="pencil-outline" size={16} color="#333" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.iconButton, { backgroundColor: '#d9534f' }]} onPress={() => handleBukaHapusDb(row)}>
+                      <Ionicons name="trash-outline" size={16} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+            </View>
+          </ScrollView>
+        )}
+      </View>
+
+      {/* --- MODAL PENCARIAN BARANG UTAMA --- */}
       <Modal visible={modalSearchVisible} animationType="slide" transparent={true} onRequestClose={() => setModalSearchVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: '80%' }]}>
@@ -1321,7 +1568,135 @@ const BarangKeluarScreen = () => {
           </View>
         </View>
       </Modal>
-      {/* Modal Konfirmasi Hapus Keranjang */}
+
+      {/* --- MODAL DETAIL DOKUMEN KELUAR --- */}
+      <Modal visible={modalDetailVisible} animationType="slide" transparent={true} onRequestClose={() => setModalDetailVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <Text style={styles.title}>Detail Dokumen Keluar</Text>
+            <Text style={[styles.reportText, { fontWeight: 'bold' }]}>No. Dokumen: {itemDetail?.noDokumen}</Text>
+            <Text style={styles.reportText}>Tanggal: {itemDetail?.tanggal}</Text>
+            <Text style={{ marginTop: 15, fontWeight: 'bold', color: '#333', marginBottom: 5 }}>Daftar Barang:</Text>
+            
+            <ScrollView style={{ maxHeight: 250, width: '100%' }}>
+              {itemDetail?.items.map((brg: any, index: number) => (
+                <View key={index} style={{ backgroundColor: '#f9f9f9', padding: 10, borderRadius: 5, marginBottom: 8, borderWidth: 1, borderColor: '#eee' }}>
+                  <Text style={{ fontWeight: 'bold', color: '#d9534f' }}>[{brg.kodeBarang}] {brg.namaBarang}</Text>
+                  <Text style={{ color: '#555', fontSize: 13 }}>Jumlah: {brg.jumlah} Unit</Text>
+                  {brg.keterangan ? <Text style={{ color: '#777', fontSize: 12, fontStyle: 'italic' }}>Ket: {brg.keterangan}</Text> : null}
+                </View>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity style={[styles.button, { backgroundColor: '#d9534f', marginTop: 15, width: '100%' }]} onPress={() => setModalDetailVisible(false)}>
+              <Text style={styles.buttonText}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- MODAL EDIT DOKUMEN & KELOLA BARANG KELUAR --- */}
+      <Modal visible={modalEditVisible} animationType="slide" transparent={true} onRequestClose={() => setModalEditVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { width: '90%', maxHeight: '85%', padding: 20 }]}>
+            <Text style={styles.title}>Edit Dokumen & Barang Keluar</Text>
+            
+            <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%' }}>
+              <Text style={styles.label}>No. Dokumen:</Text>
+              <TextInput style={styles.input} value={editNoDokumen} onChangeText={setEditNoDokumen} />
+              
+              <Text style={styles.label}>Tanggal (YYYY-MM-DD):</Text>
+              <TextInput style={styles.input} value={editTanggal} onChangeText={setEditTanggal} />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 5 }}>
+                <Text style={[styles.label, { color: '#d9534f', marginBottom: 0 }]}>Daftar Item Barang:</Text>
+                <TouchableOpacity style={{ backgroundColor: '#28a745', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 5 }} onPress={() => { setEditIndexTarget(null); setModalSearchEditVisible(true); }}>
+                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>+ Tambah Barang</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {editItemsList.map((item, index) => (
+                <View key={index} style={{ backgroundColor: '#f8f9fa', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#ddd' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={{ fontWeight: 'bold', color: '#333', flex: 1, marginRight: 10 }}>
+                      [{item.kodeBarang}] {item.namaBarang}
+                    </Text>
+                    
+                    {/* Tombol Aksi Edit & Hapus Berdampingan */}
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TouchableOpacity 
+                        style={[styles.iconButton, { backgroundColor: '#ffc107', width: 28, height: 28, borderRadius: 4, justifyContent: 'center', alignItems: 'center' }]} 
+                        onPress={() => { setEditIndexTarget(index); setModalSearchEditVisible(true); }}
+                      >
+                        <Ionicons name="pencil-outline" size={16} color="#333" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.iconButton, { backgroundColor: '#d9534f', width: 28, height: 28, borderRadius: 4, justifyContent: 'center', alignItems: 'center' }]} 
+                        onPress={() => handleHapusItemDariEdit(index)}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  
+                  <Text style={styles.label}>Jumlah:</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    keyboardType="numeric" 
+                    value={String(item.jumlah)} 
+                    onChangeText={(val) => handleUbahItemEdit(index, 'jumlah', val)} 
+                  />
+
+                  <Text style={styles.label}>Keterangan:</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    value={item.keterangan} 
+                    onChangeText={(val) => handleUbahItemEdit(index, 'keterangan', val)} 
+                  />
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 15, width: '100%' }}>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} onPress={() => setModalEditVisible(false)}>
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#28a745', flex: 1, marginLeft: 5, padding: 12 }]} onPress={handleSimpanEdit}>
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Simpan Perubahan</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* --- MODAL PENCARIAN BARANG DI EDIT --- */}
+        <Modal visible={modalSearchEditVisible} animationType="slide" transparent={true} onRequestClose={() => setModalSearchEditVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { width: '85%', height: '75%', padding: 20 }]}>
+              <Text style={styles.title}>{editIndexTarget !== null ? 'Ganti Barang Keluar' : 'Pilih Barang Tambahan'}</Text>
+              <View style={styles.searchBarContainer}>
+                <Ionicons name="search" size={20} color="#888" style={{ marginRight: 10 }} />
+                <TextInput style={styles.searchInput} placeholder="Cari master barang..." value={searchEditText} onChangeText={setSearchEditText} autoFocus={true} />
+              </View>
+              <FlatList 
+                data={filteredMasterEdit} 
+                keyExtractor={(item) => item.id} 
+                renderItem={({item}) => (
+                  <TouchableOpacity style={styles.searchListItem} onPress={() => handlePilihBarangDariMasterEdit(item)}>
+                    <Text style={styles.searchListCode}>[{item.kode}]</Text>
+                    <Text style={styles.searchListName}>{item.nama}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+              <TouchableOpacity style={[styles.button, { backgroundColor: '#d9534f', marginTop: 15 }]} onPress={() => setModalSearchEditVisible(false)}>
+                <Text style={styles.buttonText}>Batal</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+      </Modal>
+
+      {/* --- MODAL KONFIRMASI HAPUS KERANJANG --- */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -1345,6 +1720,26 @@ const BarangKeluarScreen = () => {
                 style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1, marginLeft: 5, padding: 12 }]} 
                 onPress={eksekusiHapusKeranjang}
               >
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Ya, Hapus</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- MODAL KONFIRMASI HAPUS DARI DATABASE --- */}
+      <Modal visible={modalHapusDbVisible} animationType="fade" transparent={true} onRequestClose={() => setModalHapusDbVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={[styles.title, { color: '#d9534f' }]}>Hapus Dokumen Keluar</Text>
+            <Text style={{ fontSize: 15, marginBottom: 20, textAlign: 'center', color: '#333' }}>
+              Yakin ingin menghapus seluruh data pada Dokumen <Text style={{fontWeight: 'bold'}}>{itemHapusDb?.noDokumen}</Text>?
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} onPress={() => setModalHapusDbVisible(false)}>
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1, marginLeft: 5, padding: 12 }]} onPress={eksekusiHapusDb}>
                 <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Ya, Hapus</Text>
               </TouchableOpacity>
             </View>
