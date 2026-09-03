@@ -452,11 +452,11 @@ const BarangMasukScreen = () => {
   const [modalDetailVisible, setModalDetailVisible] = useState(false);
   const [itemDetail, setItemDetail] = useState<any>(null);
 
-  // State untuk Edit Dokumen
+  // State untuk Edit Dokumen & Item di dalamnya
   const [modalEditVisible, setModalEditVisible] = useState(false);
-  const [itemEdit, setItemEdit] = useState<any>(null);
-  const [editTanggal, setEditTanggal] = useState('');
   const [editNoDokumen, setEditNoDokumen] = useState('');
+  const [editTanggal, setEditTanggal] = useState('');
+  const [editItemsList, setEditItemsList] = useState<any[]>([]);
 
   const [modalHapusDbVisible, setModalHapusDbVisible] = useState(false);
   const [itemHapusDb, setItemHapusDb] = useState<any>(null);
@@ -578,12 +578,10 @@ const BarangMasukScreen = () => {
             totalItemTypes: 0,
             totalJumlah: 0,
             keteranganGabungan: [],
-            items: [],
-            ids: []
+            items: [], // Menyimpan array objek lengkap termasuk id dokumen firestore tiap item
           };
         }
         acc[noDok].items.push(curr);
-        acc[noDok].ids.push(curr.id);
         acc[noDok].totalItemTypes += 1;
         acc[noDok].totalJumlah += Number(curr.jumlah) || 0;
         if (curr.keterangan && curr.keterangan !== '-') {
@@ -604,33 +602,43 @@ const BarangMasukScreen = () => {
     fetchBarangMasuk();
   }, []);
 
-  // Fungsi Membuka Modal Edit Dokumen
+  // Membuka Modal Edit dengan menyalin data item agar bisa diubah satuan nilainya
   const handleBukaEdit = (groupItem: any) => {
-    setItemEdit(groupItem);
     setEditNoDokumen(groupItem.noDokumen);
     setEditTanggal(groupItem.tanggal);
+    // Salin item ke state edit lokal supaya bisa diubah nama barang, jumlah, & keterangan per item
+    setEditItemsList(JSON.parse(JSON.stringify(groupItem.items)));
     setModalEditVisible(true);
   };
 
-  // Fungsi Menyimpan Perubahan Edit Dokumen ke Firebase
+  // Mengubah isi nilai properti pada item tertentu di dalam modal edit
+  const handleUbahItemEdit = (index: number, field: string, value: any) => {
+    const updatedItems = [...editItemsList];
+    updatedItems[index][field] = value;
+    setEditItemsList(updatedItems);
+  };
+
+  // Menyimpan perubahan edit ke Firebase (memperbarui dokumen dan seluruh item di dalamnya)
   const handleSimpanEdit = async () => {
     if (!editNoDokumen.trim() || !editTanggal.trim()) {
-      Alert.alert('Peringatan', 'Nomor dokumen dan tanggal tidak boleh kosong!');
+      Alert.alert('Peringatan', 'Nomor dokumen dan tanggal wajib diisi!');
       return;
     }
     try {
       setLoading(true);
-      // Perbarui semua baris dokumen yang memiliki ID terkait
-      for (let id of itemEdit.ids) {
-        const docRef = doc(db, 'barangMasuk', id);
+      for (let item of editItemsList) {
+        const docRef = doc(db, 'barangMasuk', item.id);
         await updateDoc(docRef, {
           noDokumen: editNoDokumen.trim(),
-          tanggal: editTanggal.trim()
+          tanggal: editTanggal.trim(),
+          namaBarang: item.namaBarang,
+          kodeBarang: item.kodeBarang,
+          jumlah: Number(item.jumlah) || 0,
+          keterangan: item.keterangan || '',
         });
       }
-      Alert.alert('Sukses', 'Dokumen berhasil diperbarui.');
+      Alert.alert('Sukses', 'Perubahan data berhasil disimpan.');
       setModalEditVisible(false);
-      setItemEdit(null);
       fetchBarangMasuk();
     } catch (error: any) {
       Alert.alert('Error', error.message);
@@ -647,8 +655,8 @@ const BarangMasukScreen = () => {
   const eksekusiHapusDb = async () => {
     if (!itemHapusDb) return;
     try {
-      for (let id of itemHapusDb.ids) {
-        const docRef = doc(db, 'barangMasuk', id);
+      for (let item of itemHapusDb.items) {
+        const docRef = doc(db, 'barangMasuk', item.id);
         await deleteDoc(docRef);
       }
       setModalHapusDbVisible(false);
@@ -715,7 +723,7 @@ const BarangMasukScreen = () => {
         <Text style={styles.buttonText}>{loading ? 'Menyimpan...' : 'Simpan Semua ke Database'}</Text>
       </TouchableOpacity>
 
-      {/* --- BAGIAN TABEL RIWAYAT TRANSAKSI (UKURAN PENUH MEMANJANG) --- */}
+      {/* --- TABEL RIWAYAT TRANSAKSI PENUH --- */}
       <View style={{ marginBottom: 40, width: '100%' }}>
         <Text style={[styles.title, { fontSize: 18, textAlign: 'left', marginBottom: 10 }]}>
           Riwayat Transaksi ({listBarangMasukGrouped.length} Dokumen)
@@ -727,10 +735,8 @@ const BarangMasukScreen = () => {
           <Text style={styles.subtitle}>Belum ada riwayat transaksi.</Text>
         ) : (
           <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
-            {/* Menggunakan minWidth 100% atau ukuran fleksibel agar memenuhi area layar web */}
             <View style={{ minWidth: '100%', width: '100%', backgroundColor: '#FFF', borderRadius: 8, borderWidth: 1, borderColor: '#ddd', overflow: 'hidden' }}>
               
-              {/* Header Tabel */}
               <View style={{ flexDirection: 'row', backgroundColor: '#f4f4f4', borderBottomWidth: 1, borderColor: '#ddd', paddingVertical: 12 }}>
                 <Text style={{ width: 50, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>NO.</Text>
                 <Text style={{ width: 120, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>TANGGAL</Text>
@@ -740,7 +746,6 @@ const BarangMasukScreen = () => {
                 <Text style={{ width: 120, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>AKSI</Text>
               </View>
 
-              {/* Isi Tabel */}
               {listBarangMasukGrouped.map((row, index) => (
                 <View key={index} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#eee', paddingVertical: 12, alignItems: 'center' }}>
                   <Text style={{ width: 50, textAlign: 'center', color: '#555' }}>{index + 1}</Text>
@@ -756,7 +761,6 @@ const BarangMasukScreen = () => {
                     {row.keteranganGabungan.length > 0 ? row.keteranganGabungan.join(', ') : '-'}
                   </Text>
                   
-                  {/* Kolom Aksi dengan Tombol Detail, Edit, dan Hapus */}
                   <View style={{ width: 120, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
                     <TouchableOpacity style={[styles.iconButton, { backgroundColor: '#17a2b8' }]} onPress={() => { setItemDetail(row); setModalDetailVisible(true); }}>
                       <Ionicons name="eye-outline" size={16} color="#FFF" />
@@ -837,21 +841,56 @@ const BarangMasukScreen = () => {
         </View>
       </Modal>
 
-      {/* --- MODAL EDIT DOKUMEN --- */}
+      {/* --- MODAL EDIT DOKUMEN & SEMUA DETAIL ITEMNYA --- */}
       <Modal visible={modalEditVisible} animationType="slide" transparent={true} onRequestClose={() => setModalEditVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.title}>Edit Dokumen</Text>
-            <Text style={styles.label}>No. Dokumen:</Text>
-            <TextInput style={styles.input} value={editNoDokumen} onChangeText={setEditNoDokumen} />
-            <Text style={styles.label}>Tanggal (YYYY-MM-DD):</Text>
-            <TextInput style={styles.input} value={editTanggal} onChangeText={setEditTanggal} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+          <View style={[styles.modalContent, { width: '90%', maxHeight: '85%' }]}>
+            <Text style={styles.title}>Edit Dokumen & Barang</Text>
+            
+            <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%' }}>
+              <Text style={styles.label}>No. Dokumen:</Text>
+              <TextInput style={styles.input} value={editNoDokumen} onChangeText={setEditNoDokumen} />
+              
+              <Text style={styles.label}>Tanggal (YYYY-MM-DD):</Text>
+              <TextInput style={styles.input} value={editTanggal} onChangeText={setEditTanggal} />
+
+              <Text style={[styles.label, { color: '#0056b3', marginTop: 10 }]}>Daftar Item Barang dalam Dokumen:</Text>
+              
+              {editItemsList.map((item, index) => (
+                <View key={index} style={{ backgroundColor: '#f8f9fa', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#ddd' }}>
+                  <Text style={{ fontWeight: 'bold', color: '#333', marginBottom: 5 }}>Item #{index + 1}: [{item.kodeBarang}] {item.namaBarang}</Text>
+                  
+                  <Text style={styles.label}>Nama Barang:</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    value={item.namaBarang} 
+                    onChangeText={(val) => handleUbahItemEdit(index, 'namaBarang', val)} 
+                  />
+
+                  <Text style={styles.label}>Jumlah:</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    keyboardType="numeric" 
+                    value={String(item.jumlah)} 
+                    onChangeText={(val) => handleUbahItemEdit(index, 'jumlah', val)} 
+                  />
+
+                  <Text style={styles.label}>Keterangan:</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    value={item.keterangan} 
+                    onChangeText={(val) => handleUbahItemEdit(index, 'keterangan', val)} 
+                  />
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 15, width: '100%' }}>
               <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} onPress={() => setModalEditVisible(false)}>
                 <Text style={styles.actionButtonText}>Batal</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#28a745', flex: 1, marginLeft: 5, padding: 12 }]} onPress={handleSimpanEdit}>
-                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Simpan</Text>
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Simpan Perubahan</Text>
               </TouchableOpacity>
             </View>
           </View>
