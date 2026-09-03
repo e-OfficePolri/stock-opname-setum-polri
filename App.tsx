@@ -443,6 +443,8 @@ const BarangMasukScreen = () => {
   // Keranjang untuk menampung beberapa barang sebelum disimpan sekaligus
   const [keranjang, setKeranjang] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [modalHapusVisible, setModalHapusVisible] = useState(false);
+  const [itemYangDihapus, setItemYangDihapus] = useState<any>(null);
   
   const [listMaster, setListMaster] = useState<any[]>([]);
   const [masterLoading, setMasterLoading] = useState(true);
@@ -519,9 +521,19 @@ const BarangMasukScreen = () => {
     setKeteranganItem('');
   };
 
-  // Menghapus item dari keranjang
-  const handleHapusDariKeranjang = (id: string) => {
-    setKeranjang(keranjang.filter(item => item.id !== id));
+  // 1. Fungsi untuk membuka kotak konfirmasi
+  const handleBukaModalHapus = (item: any) => {
+    setItemYangDihapus(item);
+    setModalHapusVisible(true);
+  };
+
+  // 2. Fungsi untuk mengeksekusi penghapusan dari keranjang
+  const eksekusiHapusKeranjang = () => {
+    if (itemYangDihapus) {
+      setKeranjang(keranjang.filter(item => item.id !== itemYangDihapus.id));
+      setModalHapusVisible(false); // Tutup kotak konfirmasi
+      setItemYangDihapus(null);    // Kosongkan data
+    }
   };
 
   // Menyimpan semua isi keranjang ke Firebase dengan No Dokumen yang sama
@@ -651,7 +663,7 @@ const BarangMasukScreen = () => {
             </View>
             <TouchableOpacity 
               style={[styles.iconButton, { backgroundColor: '#d9534f' }]} 
-              onPress={() => handleHapusDariKeranjang(item.id)}
+              onPress={() => handleBukaModalHapus(item)}
             >
               <Ionicons name="trash-outline" size={16} color="#FFF" />
             </TouchableOpacity>
@@ -707,6 +719,38 @@ const BarangMasukScreen = () => {
             >
               <Text style={styles.buttonText}>Tutup</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {/* Modal Konfirmasi Hapus Keranjang */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalHapusVisible}
+        onRequestClose={() => setModalHapusVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={[styles.title, { color: '#d9534f' }]}>Konfirmasi Hapus</Text>
+            
+            <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center', color: '#333' }}>
+              Apakah Anda yakin ingin menghapus "{itemYangDihapus?.namaBarang}" dari daftar masuk?
+            </Text>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} 
+                onPress={() => setModalHapusVisible(false)}
+              >
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1, marginLeft: 5, padding: 12 }]} 
+                onPress={eksekusiHapusKeranjang}
+              >
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Ya, Hapus</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
