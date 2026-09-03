@@ -425,7 +425,7 @@ const ManajemenBarangScreen = () => {
   );
 };
 
-// --- 3. LAYAR BARANG MASUK (DENGAN KERANJANG) ---
+// --- 3. LAYAR BARANG MASUK (DENGAN KERANJANG & EDIT LANJUTAN) ---
 const BarangMasukScreen = () => {
   const [noDokumen, setNoDokumen] = useState('');
   const [tanggalInput, setTanggalInput] = useState(getTanggalHariIni());
@@ -458,9 +458,10 @@ const BarangMasukScreen = () => {
   const [editTanggal, setEditTanggal] = useState('');
   const [editItemsList, setEditItemsList] = useState<any[]>([]);
 
-  // State pencarian barang khusus untuk Modal Edit (jika ingin menambah barang baru)
+  // State pencarian barang khusus untuk Modal Edit (tambah atau ubah barang)
   const [modalSearchEditVisible, setModalSearchEditVisible] = useState(false);
   const [searchEditText, setSearchEditText] = useState('');
+  const [editIndexTarget, setEditIndexTarget] = useState<number | null>(null); // Menandakan apakah sedang ganti barang atau tambah baru
 
   const [modalHapusDbVisible, setModalHapusDbVisible] = useState(false);
   const [itemHapusDb, setItemHapusDb] = useState<any>(null);
@@ -474,11 +475,7 @@ const BarangMasukScreen = () => {
         const item = docItem.data();
         tempData.push({ id: docItem.id, nama: item.namaBarang, kode: item.kodeBarang || '-' });
       });
-      tempData.sort((a, b) => {
-        const angkaA = parseInt(a.kode.replace('STM-', '')) || 0;
-        const angkaB = parseInt(b.kode.replace('STM-', '')) || 0;
-        return angkaA - angkaB; 
-      });
+      tempData.sort((a, b) => a.nama.localeCompare(b.nama)); // Urutkan abjad master
       setListMaster(tempData);
     } catch (error) {
       Alert.alert('Error', 'Gagal memuat daftar barang.');
@@ -601,6 +598,16 @@ const BarangMasukScreen = () => {
         return acc;
       }, {});
 
+      // Urutkan item di dalam masing-masing dokumen sesuai urutan awal input / createdAt
+      Object.values(groupedData).forEach((group: any) => {
+        group.items.sort((a: any, b: any) => {
+          if (a.createdAt && b.createdAt) {
+            return a.createdAt.localeCompare(b.createdAt);
+          }
+          return 0;
+        });
+      });
+
       setListBarangMasukGrouped(Object.values(groupedData));
     } catch (error) {
       console.error(error);
@@ -626,21 +633,31 @@ const BarangMasukScreen = () => {
     setEditItemsList(updatedItems);
   };
 
-  // Fungsi untuk menambah item baru langsung di dalam modal edit
-  const handleTambahItemBaruDiEdit = (itemMaster: any) => {
-    const newItem = {
-      id: null, // id null menandakan ini item baru yang belum ada di database firestore
-      kodeBarang: itemMaster.kode,
-      namaBarang: itemMaster.nama,
-      jumlah: 1,
-      keterangan: '',
-    };
-    setEditItemsList([...editItemsList, newItem]);
+  // Pilih barang dari master untuk dimasukkan atau diganti di mode edit
+  const handlePilihBarangDariMasterEdit = (itemMaster: any) => {
+    if (editIndexTarget !== null) {
+      // Mode Ganti Barang yang sudah ada
+      const updatedItems = [...editItemsList];
+      updatedItems[editIndexTarget].kodeBarang = itemMaster.kode;
+      updatedItems[editIndexTarget].namaBarang = itemMaster.nama;
+      setEditItemsList(updatedItems);
+      setEditIndexTarget(null);
+    } else {
+      // Mode Tambah Barang Baru ke List Edit
+      const newItem = {
+        id: null, 
+        kodeBarang: itemMaster.kode,
+        namaBarang: itemMaster.nama,
+        jumlah: 1,
+        keterangan: '',
+        createdAt: new Date().toISOString(),
+      };
+      setEditItemsList([...editItemsList, newItem]);
+    }
     setModalSearchEditVisible(false);
     setSearchEditText('');
   };
 
-  // Fungsi untuk menghapus salah satu item dari daftar edit
   const handleHapusItemDariEdit = (index: number) => {
     const updatedItems = editItemsList.filter((_, i) => i !== index);
     setEditItemsList(updatedItems);
@@ -657,14 +674,10 @@ const BarangMasukScreen = () => {
     }
     try {
       setLoading(true);
-      
-      // Ambil daftar ID lama yang ada pada dokumen ini untuk mendeteksi item yang dihapus
       const groupAwal = listBarangMasukGrouped.find(g => g.noDokumen === editNoDokumen);
       
-      // Simpan/Perbarui item ke Firebase
       for (let item of editItemsList) {
         if (item.id) {
-          // Update data item yang sudah ada
           const docRef = doc(db, 'barangMasuk', item.id);
           await updateDoc(docRef, {
             noDokumen: editNoDokumen.trim(),
@@ -675,7 +688,6 @@ const BarangMasukScreen = () => {
             keterangan: item.keterangan || '',
           });
         } else {
-          // Tambah dokumen baru jika item tersebut baru ditambahkan lewat modal edit
           await addDoc(collection(db, 'barangMasuk'), {
             noDokumen: editNoDokumen.trim(),
             tanggal: editTanggal.trim(),
@@ -683,12 +695,11 @@ const BarangMasukScreen = () => {
             namaBarang: item.namaBarang,
             jumlah: Number(item.jumlah) || 0,
             keterangan: item.keterangan || '',
-            createdAt: new Date().toISOString(),
+            createdAt: item.createdAt || new Date().toISOString(),
           });
         }
       }
 
-      // Hapus dari database item lama yang sudah dibuang oleh user di modal edit
       if (groupAwal && groupAwal.items) {
         const currentIds = editItemsList.filter(i => i.id !== null).map(i => i.id);
         for (let oldItem of groupAwal.items) {
@@ -862,27 +873,6 @@ const BarangMasukScreen = () => {
         </View>
       </Modal>
 
-      {/* --- MODAL PENCARIAN TAMBAH BARANG DI EDIT --- */}
-      <Modal visible={modalSearchEditVisible} animationType="slide" transparent={true} onRequestClose={() => setModalSearchEditVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: '80%' }]}>
-            <Text style={styles.title}>Pilih Barang Tambahan</Text>
-            <View style={styles.searchBarContainer}>
-              <Ionicons name="search" size={20} color="#888" style={{ marginRight: 10 }} />
-              <TextInput style={styles.searchInput} placeholder="Cari master barang..." value={searchEditText} onChangeText={setSearchEditText} autoFocus={true} />
-            </View>
-            <FlatList data={filteredMasterEdit} keyExtractor={(item) => item.id} renderItem={({item}) => (
-              <TouchableOpacity style={styles.searchListItem} onPress={() => handleTambahItemBaruDiEdit(item)}>
-                <Text style={styles.searchListCode}>[{item.kode}]</Text><Text style={styles.searchListName}>{item.nama}</Text>
-              </TouchableOpacity>
-            )}/>
-            <TouchableOpacity style={[styles.button, { backgroundColor: '#d9534f', marginTop: 15 }]} onPress={() => setModalSearchEditVisible(false)}>
-              <Text style={styles.buttonText}>Batal</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* --- MODAL KONFIRMASI HAPUS KERANJANG --- */}
       <Modal animationType="fade" transparent={true} visible={modalHapusVisible} onRequestClose={() => setModalHapusVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -938,7 +928,7 @@ const BarangMasukScreen = () => {
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 5 }}>
                 <Text style={[styles.label, { color: '#0056b3', marginBottom: 0 }]}>Daftar Item Barang:</Text>
-                <TouchableOpacity style={{ backgroundColor: '#28a745', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 5 }} onPress={() => setModalSearchEditVisible(true)}>
+                <TouchableOpacity style={{ backgroundColor: '#28a745', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 5 }} onPress={() => { setEditIndexTarget(null); setModalSearchEditVisible(true); }}>
                   <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>+ Tambah Barang</Text>
                 </TouchableOpacity>
               </View>
@@ -946,7 +936,11 @@ const BarangMasukScreen = () => {
               {editItemsList.map((item, index) => (
                 <View key={index} style={{ backgroundColor: '#f8f9fa', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#ddd' }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                    <Text style={{ fontWeight: 'bold', color: '#333' }}>[{item.kodeBarang}] {item.namaBarang}</Text>
+                    <TouchableOpacity style={{ flex: 1, marginRight: 10 }} onPress={() => { setEditIndexTarget(index); setModalSearchEditVisible(true); }}>
+                      <Text style={{ fontWeight: 'bold', color: '#0056b3', textDecorationLine: 'underline' }}>
+                        [{item.kodeBarang}] {item.namaBarang} (Ketuk untuk Ganti)
+                      </Text>
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleHapusItemDariEdit(index)}>
                       <Ionicons name="trash-outline" size={18} color="#d9534f" />
                     </TouchableOpacity>
@@ -981,11 +975,11 @@ const BarangMasukScreen = () => {
           </View>
         </View>
 
-        {/* --- MODAL PENCARIAN TAMBAH BARANG DI EDIT --- */}
+        {/* --- MODAL PENCARIAN BARANG DI EDIT (UNTUK TAMBAH / GANTI) --- */}
         <Modal visible={modalSearchEditVisible} animationType="slide" transparent={true} onRequestClose={() => setModalSearchEditVisible(false)}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { width: '85%', height: '75%', padding: 20 }]}>
-              <Text style={styles.title}>Pilih Barang Tambahan</Text>
+              <Text style={styles.title}>{editIndexTarget !== null ? 'Ganti Barang' : 'Pilih Barang Tambahan'}</Text>
               <View style={styles.searchBarContainer}>
                 <Ionicons name="search" size={20} color="#888" style={{ marginRight: 10 }} />
                 <TextInput style={styles.searchInput} placeholder="Cari master barang..." value={searchEditText} onChangeText={setSearchEditText} autoFocus={true} />
@@ -994,7 +988,7 @@ const BarangMasukScreen = () => {
                 data={filteredMasterEdit} 
                 keyExtractor={(item) => item.id} 
                 renderItem={({item}) => (
-                  <TouchableOpacity style={styles.searchListItem} onPress={() => handleTambahItemBaruDiEdit(item)}>
+                  <TouchableOpacity style={styles.searchListItem} onPress={() => handlePilihBarangDariMasterEdit(item)}>
                     <Text style={styles.searchListCode}>[{item.kode}]</Text>
                     <Text style={styles.searchListName}>{item.nama}</Text>
                   </TouchableOpacity>
@@ -1006,8 +1000,9 @@ const BarangMasukScreen = () => {
             </View>
           </View>
         </Modal>
+
       </Modal>
-      
+
       {/* --- MODAL KONFIRMASI HAPUS DARI DATABASE --- */}
       <Modal visible={modalHapusDbVisible} animationType="fade" transparent={true} onRequestClose={() => setModalHapusDbVisible(false)}>
         <View style={styles.modalOverlay}>
