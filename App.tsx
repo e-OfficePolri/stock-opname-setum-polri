@@ -452,10 +452,15 @@ const BarangMasukScreen = () => {
   const [modalDetailVisible, setModalDetailVisible] = useState(false);
   const [itemDetail, setItemDetail] = useState<any>(null);
 
+  // State untuk Edit Dokumen & Item di dalamnya
   const [modalEditVisible, setModalEditVisible] = useState(false);
   const [editNoDokumen, setEditNoDokumen] = useState('');
   const [editTanggal, setEditTanggal] = useState('');
   const [editItemsList, setEditItemsList] = useState<any[]>([]);
+
+  // State pencarian barang khusus untuk Modal Edit (jika ingin menambah barang baru)
+  const [modalSearchEditVisible, setModalSearchEditVisible] = useState(false);
+  const [searchEditText, setSearchEditText] = useState('');
 
   const [modalHapusDbVisible, setModalHapusDbVisible] = useState(false);
   const [itemHapusDb, setItemHapusDb] = useState<any>(null);
@@ -496,6 +501,11 @@ const BarangMasukScreen = () => {
   const filteredMaster = listMaster.filter(item => 
     item.nama.toLowerCase().includes(searchText.toLowerCase()) || 
     item.kode.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  const filteredMasterEdit = listMaster.filter(item => 
+    item.nama.toLowerCase().includes(searchEditText.toLowerCase()) || 
+    item.kode.toLowerCase().includes(searchEditText.toLowerCase())
   );
 
   const handleTambahKeKeranjang = () => {
@@ -576,7 +586,6 @@ const BarangMasukScreen = () => {
             tanggal: curr.tanggal || '-',
             totalItemTypes: 0,
             totalJumlah: 0,
-            // Cukup ambil keterangan dari item pertama atau string kosong
             keteranganUtama: curr.keterangan || '-',
             items: [],
           };
@@ -585,7 +594,6 @@ const BarangMasukScreen = () => {
         acc[noDok].totalItemTypes += 1;
         acc[noDok].totalJumlah += Number(curr.jumlah) || 0;
         
-        // Jika keterangan utama sebelumnya kosong/strip, perbarui dengan keterangan baru jika ada
         if ((!acc[noDok].keteranganUtama || acc[noDok].keteranganUtama === '-') && curr.keterangan) {
           acc[noDok].keteranganUtama = curr.keterangan;
         }
@@ -618,24 +626,78 @@ const BarangMasukScreen = () => {
     setEditItemsList(updatedItems);
   };
 
+  // Fungsi untuk menambah item baru langsung di dalam modal edit
+  const handleTambahItemBaruDiEdit = (itemMaster: any) => {
+    const newItem = {
+      id: null, // id null menandakan ini item baru yang belum ada di database firestore
+      kodeBarang: itemMaster.kode,
+      namaBarang: itemMaster.nama,
+      jumlah: 1,
+      keterangan: '',
+    };
+    setEditItemsList([...editItemsList, newItem]);
+    setModalSearchEditVisible(false);
+    setSearchEditText('');
+  };
+
+  // Fungsi untuk menghapus salah satu item dari daftar edit
+  const handleHapusItemDariEdit = (index: number) => {
+    const updatedItems = editItemsList.filter((_, i) => i !== index);
+    setEditItemsList(updatedItems);
+  };
+
   const handleSimpanEdit = async () => {
     if (!editNoDokumen.trim() || !editTanggal.trim()) {
       Alert.alert('Peringatan', 'Nomor dokumen dan tanggal wajib diisi!');
       return;
     }
+    if (editItemsList.length === 0) {
+      Alert.alert('Peringatan', 'Dokumen harus memiliki minimal 1 item barang!');
+      return;
+    }
     try {
       setLoading(true);
+      
+      // Ambil daftar ID lama yang ada pada dokumen ini untuk mendeteksi item yang dihapus
+      const groupAwal = listBarangMasukGrouped.find(g => g.noDokumen === editNoDokumen);
+      
+      // Simpan/Perbarui item ke Firebase
       for (let item of editItemsList) {
-        const docRef = doc(db, 'barangMasuk', item.id);
-        await updateDoc(docRef, {
-          noDokumen: editNoDokumen.trim(),
-          tanggal: editTanggal.trim(),
-          namaBarang: item.namaBarang,
-          kodeBarang: item.kodeBarang,
-          jumlah: Number(item.jumlah) || 0,
-          keterangan: item.keterangan || '',
-        });
+        if (item.id) {
+          // Update data item yang sudah ada
+          const docRef = doc(db, 'barangMasuk', item.id);
+          await updateDoc(docRef, {
+            noDokumen: editNoDokumen.trim(),
+            tanggal: editTanggal.trim(),
+            namaBarang: item.namaBarang,
+            kodeBarang: item.kodeBarang,
+            jumlah: Number(item.jumlah) || 0,
+            keterangan: item.keterangan || '',
+          });
+        } else {
+          // Tambah dokumen baru jika item tersebut baru ditambahkan lewat modal edit
+          await addDoc(collection(db, 'barangMasuk'), {
+            noDokumen: editNoDokumen.trim(),
+            tanggal: editTanggal.trim(),
+            kodeBarang: item.kodeBarang,
+            namaBarang: item.namaBarang,
+            jumlah: Number(item.jumlah) || 0,
+            keterangan: item.keterangan || '',
+            createdAt: new Date().toISOString(),
+          });
+        }
       }
+
+      // Hapus dari database item lama yang sudah dibuang oleh user di modal edit
+      if (groupAwal && groupAwal.items) {
+        const currentIds = editItemsList.filter(i => i.id !== null).map(i => i.id);
+        for (let oldItem of groupAwal.items) {
+          if (!currentIds.includes(oldItem.id)) {
+            await deleteDoc(doc(db, 'barangMasuk', oldItem.id));
+          }
+        }
+      }
+
       Alert.alert('Sukses', 'Perubahan data berhasil disimpan.');
       setModalEditVisible(false);
       fetchBarangMasuk();
@@ -722,7 +784,7 @@ const BarangMasukScreen = () => {
         <Text style={styles.buttonText}>{loading ? 'Menyimpan...' : 'Simpan Semua ke Database'}</Text>
       </TouchableOpacity>
 
-      {/* --- TABEL RIWAYAT TRANSAKSI PENUH --- */}
+      {/* --- TABEL RIWAYAT TRANSAKSI PENUH MEMANJANG (100%) --- */}
       <View style={{ marginBottom: 40, width: '100%' }}>
         <Text style={[styles.title, { fontSize: 18, textAlign: 'left', marginBottom: 10 }]}>
           Riwayat Transaksi ({listBarangMasukGrouped.length} Dokumen)
@@ -756,7 +818,6 @@ const BarangMasukScreen = () => {
                     <Text style={{ color: '#888', fontSize: 12 }}>({row.totalJumlah} Unit)</Text>
                   </View>
 
-                  {/* Menampilkan hanya satu keterangan utama */}
                   <Text style={{ flex: 2, minWidth: 180, paddingHorizontal: 10, color: '#555', fontSize: 12 }} numberOfLines={1}>
                     {row.keteranganUtama}
                   </Text>
@@ -780,7 +841,7 @@ const BarangMasukScreen = () => {
         )}
       </View>
 
-      {/* --- MODAL PENCARIAN --- */}
+      {/* --- MODAL PENCARIAN UTAMA --- */}
       <Modal visible={modalSearchVisible} animationType="slide" transparent={true} onRequestClose={() => setModalSearchVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: '80%' }]}>
@@ -796,6 +857,27 @@ const BarangMasukScreen = () => {
             )}/>
             <TouchableOpacity style={[styles.button, { backgroundColor: '#d9534f', marginTop: 15 }]} onPress={() => setModalSearchVisible(false)}>
               <Text style={styles.buttonText}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- MODAL PENCARIAN TAMBAH BARANG DI EDIT --- */}
+      <Modal visible={modalSearchEditVisible} animationType="slide" transparent={true} onRequestClose={() => setModalSearchEditVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '80%' }]}>
+            <Text style={styles.title}>Pilih Barang Tambahan</Text>
+            <View style={styles.searchBarContainer}>
+              <Ionicons name="search" size={20} color="#888" style={{ marginRight: 10 }} />
+              <TextInput style={styles.searchInput} placeholder="Cari master barang..." value={searchEditText} onChangeText={setSearchEditText} autoFocus={true} />
+            </View>
+            <FlatList data={filteredMasterEdit} keyExtractor={(item) => item.id} renderItem={({item}) => (
+              <TouchableOpacity style={styles.searchListItem} onPress={() => handleTambahItemBaruDiEdit(item)}>
+                <Text style={styles.searchListCode}>[{item.kode}]</Text><Text style={styles.searchListName}>{item.nama}</Text>
+              </TouchableOpacity>
+            )}/>
+            <TouchableOpacity style={[styles.button, { backgroundColor: '#d9534f', marginTop: 15 }]} onPress={() => setModalSearchEditVisible(false)}>
+              <Text style={styles.buttonText}>Batal</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -841,7 +923,7 @@ const BarangMasukScreen = () => {
         </View>
       </Modal>
 
-      {/* --- MODAL EDIT DOKUMEN & SEMUA DETAIL ITEMNYA --- */}
+      {/* --- MODAL EDIT DOKUMEN & KELOLA BARANG --- */}
       <Modal visible={modalEditVisible} animationType="slide" transparent={true} onRequestClose={() => setModalEditVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { width: '90%', maxHeight: '85%' }]}>
@@ -854,19 +936,22 @@ const BarangMasukScreen = () => {
               <Text style={styles.label}>Tanggal (YYYY-MM-DD):</Text>
               <TextInput style={styles.input} value={editTanggal} onChangeText={setEditTanggal} />
 
-              <Text style={[styles.label, { color: '#0056b3', marginTop: 10 }]}>Daftar Item Barang dalam Dokumen:</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 5 }}>
+                <Text style={[styles.label, { color: '#0056b3', marginBottom: 0 }]}>Daftar Item Barang:</Text>
+                <TouchableOpacity style={{ backgroundColor: '#28a745', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 5 }} onPress={() => setModalSearchEditVisible(true)}>
+                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>+ Tambah Barang</Text>
+                </TouchableOpacity>
+              </View>
               
               {editItemsList.map((item, index) => (
                 <View key={index} style={{ backgroundColor: '#f8f9fa', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#ddd' }}>
-                  <Text style={{ fontWeight: 'bold', color: '#333', marginBottom: 5 }}>Item #{index + 1}: [{item.kodeBarang}] {item.namaBarang}</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <Text style={{ fontWeight: 'bold', color: '#333' }}>[{item.kodeBarang}] {item.namaBarang}</Text>
+                    <TouchableOpacity onPress={() => handleHapusItemDariEdit(index)}>
+                      <Ionicons name="trash-outline" size={18} color="#d9534f" />
+                    </TouchableOpacity>
+                  </View>
                   
-                  <Text style={styles.label}>Nama Barang:</Text>
-                  <TextInput 
-                    style={styles.input} 
-                    value={item.namaBarang} 
-                    onChangeText={(val) => handleUbahItemEdit(index, 'namaBarang', val)} 
-                  />
-
                   <Text style={styles.label}>Jumlah:</Text>
                   <TextInput 
                     style={styles.input} 
