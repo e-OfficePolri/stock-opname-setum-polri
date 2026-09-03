@@ -214,30 +214,52 @@ const ManajemenBarangScreen = () => {
     }
   };
 
-  const handleDeleteItem = (item: any) => {
-    Alert.alert(
-      'Konfirmasi Hapus',
-      `Yakin ingin menghapus "${item.nama}" dari Master Barang? Data yang dihapus tidak bisa dikembalikan.`,
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Hapus',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const docRef = doc(db, 'barangMaster', item.id);
-              await deleteDoc(docRef);
+  const handleDeleteItem = async (item: any) => {
+    // 1. Logika khusus jika aplikasi dijalankan di Komputer (Web Browser)
+    if (Platform.OS === 'web') {
+      // Menggunakan pop-up konfirmasi bawaan browser komputer
+      const setujuHapus = window.confirm(`Apakah Anda yakin ingin menghapus data "${item.nama}" (${item.jenis})?`);
+      
+      // Jika user klik "OK" di browser
+      if (setujuHapus) {
+        try {
+          const docRef = doc(db, item.koleksiAsal, item.id);
+          await deleteDoc(docRef);
+          
+          window.alert('Sukses: Data berhasil dihapus dari database!');
+          fetchLogData(); // Menyegarkan daftar log
+        } catch (err: any) {
+          console.error("Gagal menghapus data: ", err);
+          window.alert(`Error: Gagal menghapus: ${err.message}`);
+        }
+      }
+    } 
+    // 2. Logika asli jika aplikasi dijalankan di HP (Android/iOS)
+    else {
+      Alert.alert(
+        'Konfirmasi Hapus',
+        `Apakah Anda yakin ingin menghapus data "${item.nama}" (${item.jenis})?`,
+        [
+          { text: 'Batal', style: 'cancel' },
+          {
+            text: 'Hapus',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const docRef = doc(db, item.koleksiAsal, item.id);
+                await deleteDoc(docRef);
 
-              Alert.alert('Sukses', 'Barang berhasil dihapus!');
-              fetchBarangMaster();
-            } catch (err: any) {
-              console.error("Gagal menghapus data: ", err);
-              Alert.alert('Error', `Gagal menghapus: ${err.message}`);
-            }
+                Alert.alert('Sukses', 'Data berhasil dihapus dari database!');
+                fetchLogData();
+              } catch (err: any) {
+                console.error("Gagal menghapus data: ", err);
+                Alert.alert('Error', `Gagal menghapus: ${err.message}`);
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const renderItemBarang = ({ item }: { item: any }) => (
