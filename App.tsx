@@ -999,6 +999,8 @@ const LogBarangScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [itemYangDiedit, setItemYangDiedit] = useState<any>(null);
   const [textBaru, setTextBaru] = useState('');
+  const [modalHapusVisible, setModalHapusVisible] = useState(false);
+  const [itemYangDihapus, setItemYangDihapus] = useState<any>(null);
 
   const fetchLogData = async () => {
     try {
@@ -1079,29 +1081,25 @@ const LogBarangScreen = () => {
   };
 
   const handleDeleteItem = (item: any) => {
-    Alert.alert(
-      'Konfirmasi Hapus',
-      `Apakah Anda yakin ingin menghapus data "${item.nama}" (${item.jenis})?`,
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Hapus',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const docRef = doc(db, item.koleksiAsal, item.id);
-              await deleteDoc(docRef);
+    setItemYangDihapus(item);
+    setModalHapusVisible(true);
+  };
 
-              Alert.alert('Sukses', 'Data berhasil dihapus dari database!');
-              fetchLogData();
-            } catch (err: any) {
-              console.error("Gagal menghapus data: ", err);
-              Alert.alert('Error', `Gagal menghapus: ${err.message}`);
-            }
-          },
-        },
-      ]
-    );
+  const eksekusiHapus = async () => {
+    if (!itemYangDihapus) return;
+
+    try {
+      const docRef = doc(db, itemYangDihapus.koleksiAsal, itemYangDihapus.id);
+      await deleteDoc(docRef);
+
+      setModalHapusVisible(false); // Tutup kotak konfirmasi
+      setItemYangDihapus(null);    // Kosongkan data yang dipilih
+      fetchLogData();              // Refresh daftar log
+      
+    } catch (err: any) {
+      console.error("Gagal menghapus: ", err);
+      Alert.alert('Error', `Gagal menghapus: ${err.message}`);
+    }
   };
 
   const renderItem = ({ item }: { item: any }) => (
