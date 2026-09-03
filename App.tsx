@@ -1601,63 +1601,74 @@ const BarangKeluarScreen = () => {
           <View style={[styles.modalContent, { width: '90%', maxHeight: '85%', padding: 20 }]}>
             <Text style={styles.title}>Edit Dokumen & Barang Keluar</Text>
             
-            <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%' }}>
-              <Text style={styles.label}>No. Dokumen:</Text>
-              <TextInput style={styles.input} value={editNoDokumen} onChangeText={setEditNoDokumen} />
-              
-              <Text style={styles.label}>Tanggal (YYYY-MM-DD):</Text>
-              <TextInput style={styles.input} value={editTanggal} onChangeText={setEditTanggal} />
+            {/* Bagian Informasi Utama Dokumen */}
+            <Text style={styles.label}>No. Dokumen:</Text>
+            <TextInput style={styles.input} value={editNoDokumen} onChangeText={setEditNoDokumen} />
+            
+            <Text style={styles.label}>Tanggal (YYYY-MM-DD):</Text>
+            <TextInput style={styles.input} value={editTanggal} onChangeText={setEditTanggal} />
 
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 5 }}>
-                <Text style={[styles.label, { color: '#d9534f', marginBottom: 0 }]}>Daftar Item Barang:</Text>
-                <TouchableOpacity style={{ backgroundColor: '#28a745', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 5 }} onPress={() => { setEditIndexTarget(null); setModalSearchEditVisible(true); }}>
-                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>+ Tambah Barang</Text>
-                </TouchableOpacity>
-              </View>
-              
-              {editItemsList.map((item, index) => (
-                <View key={index} style={{ backgroundColor: '#f8f9fa', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#ddd' }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={{ fontWeight: 'bold', color: '#333', flex: 1, marginRight: 10 }}>
-                      [{item.kodeBarang}] {item.namaBarang}
-                    </Text>
-                    
-                    {/* Tombol Aksi Edit & Hapus Berdampingan */}
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <TouchableOpacity 
-                        style={[styles.iconButton, { backgroundColor: '#ffc107', width: 28, height: 28, borderRadius: 4, justifyContent: 'center', alignItems: 'center' }]} 
-                        onPress={() => { setEditIndexTarget(index); setModalSearchEditVisible(true); }}
-                      >
-                        <Ionicons name="pencil-outline" size={16} color="#333" />
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.iconButton, { backgroundColor: '#d9534f', width: 28, height: 28, borderRadius: 4, justifyContent: 'center', alignItems: 'center' }]} 
-                        onPress={() => handleHapusItemDariEdit(index)}
-                      >
-                        <Ionicons name="trash-outline" size={16} color="#FFF" />
-                      </TouchableOpacity>
+            {/* Tombol Tambah Barang ditarik ke atas agar mudah diakses */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 10 }}>
+              <Text style={[styles.label, { color: '#d9534f', marginBottom: 0 }]}>Daftar Item Barang ({editItemsList.length}):</Text>
+              <TouchableOpacity 
+                style={{ backgroundColor: '#28a745', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 5 }} 
+                onPress={() => { setEditIndexTarget(null); setModalSearchEditVisible(true); }}
+              >
+                <Text style={{ color: '#FFF', fontSize: 13, fontWeight: 'bold' }}>+ Tambah Barang</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Area Daftar Item dengan Scroll Tersendiri */}
+            <ScrollView showsVerticalScrollIndicator={true} style={{ width: '100%', maxHeight: 280, backgroundColor: '#f1f3f5', padding: 8, borderRadius: 8, marginBottom: 10 }}>
+              {editItemsList.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: '#888', fontStyle: 'italic', marginVertical: 20 }}>Belum ada item dalam dokumen ini.</Text>
+              ) : (
+                editItemsList.map((item, index) => (
+                  <View key={index} style={{ backgroundColor: '#FFF', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#ddd' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text style={{ fontWeight: 'bold', color: '#333', flex: 1, marginRight: 10 }}>
+                        [{item.kodeBarang}] {item.namaBarang}
+                      </Text>
+                      
+                      {/* Tombol Aksi Edit & Hapus Berdampingan */}
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity 
+                          style={[styles.iconButton, { backgroundColor: '#ffc107', width: 28, height: 28, borderRadius: 4, justifyContent: 'center', alignItems: 'center' }]} 
+                          onPress={() => { setEditIndexTarget(index); setModalSearchEditVisible(true); }}
+                        >
+                          <Ionicons name="pencil-outline" size={16} color="#333" />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.iconButton, { backgroundColor: '#d9534f', width: 28, height: 28, borderRadius: 4, justifyContent: 'center', alignItems: 'center' }]} 
+                          onPress={() => handleHapusItemDariEdit(index)}
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#FFF" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
-                  
-                  <Text style={styles.label}>Jumlah:</Text>
-                  <TextInput 
-                    style={styles.input} 
-                    keyboardType="numeric" 
-                    value={String(item.jumlah)} 
-                    onChangeText={(val) => handleUbahItemEdit(index, 'jumlah', val)} 
-                  />
+                    
+                    <Text style={styles.label}>Jumlah:</Text>
+                    <TextInput 
+                      style={styles.input} 
+                      keyboardType="numeric" 
+                      value={String(item.jumlah)} 
+                      onChangeText={(val) => handleUbahItemEdit(index, 'jumlah', val)} 
+                    />
 
-                  <Text style={styles.label}>Keterangan:</Text>
-                  <TextInput 
-                    style={styles.input} 
-                    value={item.keterangan} 
-                    onChangeText={(val) => handleUbahItemEdit(index, 'keterangan', val)} 
-                  />
-                </View>
-              ))}
+                    <Text style={styles.label}>Keterangan:</Text>
+                    <TextInput 
+                      style={styles.input} 
+                      value={item.keterangan} 
+                      onChangeText={(val) => handleUbahItemEdit(index, 'keterangan', val)} 
+                    />
+                  </View>
+                ))
+              )}
             </ScrollView>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 15, width: '100%' }}>
+            {/* Tombol Aksi Bawah */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5, width: '100%' }}>
               <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} onPress={() => setModalEditVisible(false)}>
                 <Text style={styles.actionButtonText}>Batal</Text>
               </TouchableOpacity>
@@ -1693,7 +1704,6 @@ const BarangKeluarScreen = () => {
             </View>
           </View>
         </Modal>
-
       </Modal>
 
       {/* --- MODAL KONFIRMASI HAPUS KERANJANG --- */}
