@@ -452,7 +452,6 @@ const BarangMasukScreen = () => {
   const [modalDetailVisible, setModalDetailVisible] = useState(false);
   const [itemDetail, setItemDetail] = useState<any>(null);
 
-  // State untuk Edit Dokumen & Item di dalamnya
   const [modalEditVisible, setModalEditVisible] = useState(false);
   const [editNoDokumen, setEditNoDokumen] = useState('');
   const [editTanggal, setEditTanggal] = useState('');
@@ -577,16 +576,20 @@ const BarangMasukScreen = () => {
             tanggal: curr.tanggal || '-',
             totalItemTypes: 0,
             totalJumlah: 0,
-            keteranganGabungan: [],
-            items: [], // Menyimpan array objek lengkap termasuk id dokumen firestore tiap item
+            // Cukup ambil keterangan dari item pertama atau string kosong
+            keteranganUtama: curr.keterangan || '-',
+            items: [],
           };
         }
         acc[noDok].items.push(curr);
         acc[noDok].totalItemTypes += 1;
         acc[noDok].totalJumlah += Number(curr.jumlah) || 0;
-        if (curr.keterangan && curr.keterangan !== '-') {
-          acc[noDok].keteranganGabungan.push(curr.keterangan);
+        
+        // Jika keterangan utama sebelumnya kosong/strip, perbarui dengan keterangan baru jika ada
+        if ((!acc[noDok].keteranganUtama || acc[noDok].keteranganUtama === '-') && curr.keterangan) {
+          acc[noDok].keteranganUtama = curr.keterangan;
         }
+
         return acc;
       }, {});
 
@@ -602,23 +605,19 @@ const BarangMasukScreen = () => {
     fetchBarangMasuk();
   }, []);
 
-  // Membuka Modal Edit dengan menyalin data item agar bisa diubah satuan nilainya
   const handleBukaEdit = (groupItem: any) => {
     setEditNoDokumen(groupItem.noDokumen);
     setEditTanggal(groupItem.tanggal);
-    // Salin item ke state edit lokal supaya bisa diubah nama barang, jumlah, & keterangan per item
     setEditItemsList(JSON.parse(JSON.stringify(groupItem.items)));
     setModalEditVisible(true);
   };
 
-  // Mengubah isi nilai properti pada item tertentu di dalam modal edit
   const handleUbahItemEdit = (index: number, field: string, value: any) => {
     const updatedItems = [...editItemsList];
     updatedItems[index][field] = value;
     setEditItemsList(updatedItems);
   };
 
-  // Menyimpan perubahan edit ke Firebase (memperbarui dokumen dan seluruh item di dalamnya)
   const handleSimpanEdit = async () => {
     if (!editNoDokumen.trim() || !editTanggal.trim()) {
       Alert.alert('Peringatan', 'Nomor dokumen dan tanggal wajib diisi!');
@@ -757,8 +756,9 @@ const BarangMasukScreen = () => {
                     <Text style={{ color: '#888', fontSize: 12 }}>({row.totalJumlah} Unit)</Text>
                   </View>
 
-                  <Text style={{ flex: 2, minWidth: 180, paddingHorizontal: 10, color: '#555', fontSize: 12 }} numberOfLines={2}>
-                    {row.keteranganGabungan.length > 0 ? row.keteranganGabungan.join(', ') : '-'}
+                  {/* Menampilkan hanya satu keterangan utama */}
+                  <Text style={{ flex: 2, minWidth: 180, paddingHorizontal: 10, color: '#555', fontSize: 12 }} numberOfLines={1}>
+                    {row.keteranganUtama}
                   </Text>
                   
                   <View style={{ width: 120, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
