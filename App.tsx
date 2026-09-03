@@ -446,12 +446,17 @@ const BarangMasukScreen = () => {
   const [modalSearchVisible, setModalSearchVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
 
-  // Menyimpan data yang sudah DENGKELOMPOKKAN per dokumen
   const [listBarangMasukGrouped, setListBarangMasukGrouped] = useState<any[]>([]);
   const [loadingDataMasuk, setLoadingDataMasuk] = useState(true);
 
   const [modalDetailVisible, setModalDetailVisible] = useState(false);
   const [itemDetail, setItemDetail] = useState<any>(null);
+
+  // State untuk Edit Dokumen
+  const [modalEditVisible, setModalEditVisible] = useState(false);
+  const [itemEdit, setItemEdit] = useState<any>(null);
+  const [editTanggal, setEditTanggal] = useState('');
+  const [editNoDokumen, setEditNoDokumen] = useState('');
 
   const [modalHapusDbVisible, setModalHapusDbVisible] = useState(false);
   const [itemHapusDb, setItemHapusDb] = useState<any>(null);
@@ -472,7 +477,7 @@ const BarangMasukScreen = () => {
       });
       setListMaster(tempData);
     } catch (error) {
-      Alert.alert('Error', 'Gagal memuat daftar barang dari master.');
+      Alert.alert('Error', 'Gagal memuat daftar barang.');
     } finally {
       setMasterLoading(false);
     }
@@ -496,7 +501,7 @@ const BarangMasukScreen = () => {
 
   const handleTambahKeKeranjang = () => {
     if (!namaBarang || !jumlah || Number(jumlah) <= 0) {
-      Alert.alert('Peringatan', 'Pilih nama barang dan masukkan jumlah dengan benar!');
+      Alert.alert('Peringatan', 'Pilih nama barang dan masukkan jumlah!');
       return;
     }
     const newItem = {
@@ -529,7 +534,7 @@ const BarangMasukScreen = () => {
       return;
     }
     if (keranjang.length === 0) {
-      Alert.alert('Peringatan', 'Keranjang masih kosong!');
+      Alert.alert('Peringatan', 'Keranjang kosong!');
       return;
     }
     try {
@@ -545,17 +550,16 @@ const BarangMasukScreen = () => {
           createdAt: new Date().toISOString(),
         });
       }
-      Alert.alert('Sukses', `Berhasil disimpan!`);
+      Alert.alert('Sukses', 'Data berhasil disimpan!');
       setNoDokumen(''); setTanggalInput(getTanggalHariIni()); setKeranjang([]);
       fetchBarangMasuk(); 
     } catch (error: any) {
-      Alert.alert('Error', `Gagal menyimpan: ${error.message}`);
+      Alert.alert('Error', error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- LOGIKA MENGAMBIL DAN MENGELOMPOKKAN DATA ---
   const fetchBarangMasuk = async () => {
     try {
       setLoadingDataMasuk(true);
@@ -565,21 +569,19 @@ const BarangMasukScreen = () => {
         tempData.push({ id: docItem.id, ...docItem.data() });
       });
 
-      // Mengelompokkan data berdasarkan noDokumen
       const groupedData = tempData.reduce((acc: any, curr: any) => {
         const noDok = curr.noDokumen || '-';
         if (!acc[noDok]) {
           acc[noDok] = {
             noDokumen: noDok,
             tanggal: curr.tanggal || '-',
-            totalItemTypes: 0, // Berapa macam barang
-            totalJumlah: 0,    // Total unit/kuantitas keseluruhan
+            totalItemTypes: 0,
+            totalJumlah: 0,
             keteranganGabungan: [],
-            items: [],         // Menyimpan detail barang
-            ids: []            // Menyimpan ID dokumen Firebase untuk keperluan hapus
+            items: [],
+            ids: []
           };
         }
-        
         acc[noDok].items.push(curr);
         acc[noDok].ids.push(curr.id);
         acc[noDok].totalItemTypes += 1;
@@ -587,17 +589,12 @@ const BarangMasukScreen = () => {
         if (curr.keterangan && curr.keterangan !== '-') {
           acc[noDok].keteranganGabungan.push(curr.keterangan);
         }
-        
         return acc;
       }, {});
 
-      // Mengubah objek hasil kelompok menjadi array agar bisa ditampilkan di FlatList/Map
-      const groupedArray = Object.values(groupedData);
-      
-      // Urutkan berdasarkan tanggal terbaru jika ada field createdAt, jika tidak biarkan default
-      setListBarangMasukGrouped(groupedArray);
+      setListBarangMasukGrouped(Object.values(groupedData));
     } catch (error) {
-      console.error("Gagal memuat data: ", error);
+      console.error(error);
     } finally {
       setLoadingDataMasuk(false);
     }
@@ -607,7 +604,41 @@ const BarangMasukScreen = () => {
     fetchBarangMasuk();
   }, []);
 
-  // --- FUNGSI HAPUS GROUP (SATU DOKUMEN) ---
+  // Fungsi Membuka Modal Edit Dokumen
+  const handleBukaEdit = (groupItem: any) => {
+    setItemEdit(groupItem);
+    setEditNoDokumen(groupItem.noDokumen);
+    setEditTanggal(groupItem.tanggal);
+    setModalEditVisible(true);
+  };
+
+  // Fungsi Menyimpan Perubahan Edit Dokumen ke Firebase
+  const handleSimpanEdit = async () => {
+    if (!editNoDokumen.trim() || !editTanggal.trim()) {
+      Alert.alert('Peringatan', 'Nomor dokumen dan tanggal tidak boleh kosong!');
+      return;
+    }
+    try {
+      setLoading(true);
+      // Perbarui semua baris dokumen yang memiliki ID terkait
+      for (let id of itemEdit.ids) {
+        const docRef = doc(db, 'barangMasuk', id);
+        await updateDoc(docRef, {
+          noDokumen: editNoDokumen.trim(),
+          tanggal: editTanggal.trim()
+        });
+      }
+      Alert.alert('Sukses', 'Dokumen berhasil diperbarui.');
+      setModalEditVisible(false);
+      setItemEdit(null);
+      fetchBarangMasuk();
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleBukaHapusDb = (groupItem: any) => {
     setItemHapusDb(groupItem);
     setModalHapusDbVisible(true);
@@ -616,7 +647,6 @@ const BarangMasukScreen = () => {
   const eksekusiHapusDb = async () => {
     if (!itemHapusDb) return;
     try {
-      // Karena 1 dokumen bisa berisi banyak barang, kita hapus semuanya berdasarkan ID
       for (let id of itemHapusDb.ids) {
         const docRef = doc(db, 'barangMasuk', id);
         await deleteDoc(docRef);
@@ -624,21 +654,16 @@ const BarangMasukScreen = () => {
       setModalHapusDbVisible(false);
       setItemHapusDb(null);
       fetchBarangMasuk();
-      Alert.alert('Sukses', 'Seluruh data dalam dokumen tersebut berhasil dihapus.');
+      Alert.alert('Sukses', 'Dokumen berhasil dihapus.');
     } catch (error: any) {
-      Alert.alert('Error', `Gagal menghapus: ${error.message}`);
+      Alert.alert('Error', error.message);
     }
-  };
-
-  const handleDownloadData = () => {
-    Alert.alert('Unduh Data', 'Data rekapitulasi barang masuk berhasil diunduh.');
   };
 
   return (
     <ScrollView style={styles.logContainer} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>Input Barang Masuk</Text>
       
-      {/* ... FORM INPUT TETAP SAMA SEPERTI SEBELUMNYA ... */}
       <Text style={styles.label}>No. Dokumen / No. Nota / Surmas:</Text>
       <TextInput style={styles.input} placeholder="Contoh: B/ND-102/IX/2026" value={noDokumen} onChangeText={setNoDokumen} />
 
@@ -647,7 +672,6 @@ const BarangMasukScreen = () => {
 
       <View style={{ backgroundColor: '#FFF', padding: 15, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#E0E0E0' }}>
         <Text style={[styles.label, { color: '#0056b3' }]}>Form Tambah Item Barang</Text>
-
         <Text style={styles.label}>Kode Barang:</Text>
         <TextInput style={[styles.input, { backgroundColor: '#E9ECEF', color: '#6c757d' }]} value={kodeTerpilih} editable={false} placeholder="Pilih barang terlebih dahulu..." />
 
@@ -691,12 +715,8 @@ const BarangMasukScreen = () => {
         <Text style={styles.buttonText}>{loading ? 'Menyimpan...' : 'Simpan Semua ke Database'}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.button, { backgroundColor: '#17a2b8', marginBottom: 20 }]} onPress={handleDownloadData}>
-        <Text style={styles.buttonText}>📥 Download Laporan</Text>
-      </TouchableOpacity>
-
-      {/* --- BAGIAN TABEL RIWAYAT TRANSAKSI --- */}
-      <View style={{ marginBottom: 40 }}>
+      {/* --- BAGIAN TABEL RIWAYAT TRANSAKSI (UKURAN PENUH MEMANJANG) --- */}
+      <View style={{ marginBottom: 40, width: '100%' }}>
         <Text style={[styles.title, { fontSize: 18, textAlign: 'left', marginBottom: 10 }]}>
           Riwayat Transaksi ({listBarangMasukGrouped.length} Dokumen)
         </Text>
@@ -706,45 +726,46 @@ const BarangMasukScreen = () => {
         ) : listBarangMasukGrouped.length === 0 ? (
           <Text style={styles.subtitle}>Belum ada riwayat transaksi.</Text>
         ) : (
-          // ScrollView Horizontal untuk tabel agar tidak terpotong di layar HP
-          <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 650, backgroundColor: '#FFF', borderRadius: 8, borderWidth: 1, borderColor: '#ddd', overflow: 'hidden' }}>
+          <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} style={{ width: '100%' }}>
+            {/* Menggunakan minWidth 100% atau ukuran fleksibel agar memenuhi area layar web */}
+            <View style={{ minWidth: '100%', width: '100%', backgroundColor: '#FFF', borderRadius: 8, borderWidth: 1, borderColor: '#ddd', overflow: 'hidden' }}>
               
               {/* Header Tabel */}
               <View style={{ flexDirection: 'row', backgroundColor: '#f4f4f4', borderBottomWidth: 1, borderColor: '#ddd', paddingVertical: 12 }}>
-                <Text style={{ width: 40, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>NO.</Text>
-                <Text style={{ width: 100, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>TANGGAL</Text>
-                <Text style={{ width: 180, paddingHorizontal: 10, fontWeight: 'bold', color: '#333' }}>NO. DOKUMEN</Text>
-                <Text style={{ width: 120, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>JML BARANG</Text>
-                <Text style={{ width: 120, paddingHorizontal: 10, fontWeight: 'bold', color: '#333' }}>KETERANGAN</Text>
-                <Text style={{ width: 90, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>AKSI</Text>
+                <Text style={{ width: 50, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>NO.</Text>
+                <Text style={{ width: 120, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>TANGGAL</Text>
+                <Text style={{ flex: 2, minWidth: 200, paddingHorizontal: 10, fontWeight: 'bold', color: '#333' }}>NO. DOKUMEN</Text>
+                <Text style={{ width: 140, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>JML BARANG</Text>
+                <Text style={{ flex: 2, minWidth: 180, paddingHorizontal: 10, fontWeight: 'bold', color: '#333' }}>KETERANGAN</Text>
+                <Text style={{ width: 120, textAlign: 'center', fontWeight: 'bold', color: '#333' }}>AKSI</Text>
               </View>
 
               {/* Isi Tabel */}
               {listBarangMasukGrouped.map((row, index) => (
                 <View key={index} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#eee', paddingVertical: 12, alignItems: 'center' }}>
-                  <Text style={{ width: 40, textAlign: 'center', color: '#555' }}>{index + 1}</Text>
-                  <Text style={{ width: 100, textAlign: 'center', color: '#555' }}>{row.tanggal}</Text>
-                  <Text style={{ width: 180, paddingHorizontal: 10, color: '#0056b3', fontWeight: 'bold' }}>{row.noDokumen}</Text>
+                  <Text style={{ width: 50, textAlign: 'center', color: '#555' }}>{index + 1}</Text>
+                  <Text style={{ width: 120, textAlign: 'center', color: '#555' }}>{row.tanggal}</Text>
+                  <Text style={{ flex: 2, minWidth: 200, paddingHorizontal: 10, color: '#0056b3', fontWeight: 'bold' }}>{row.noDokumen}</Text>
                   
-                  {/* Tampilkan total item unik dan total unit */}
-                  <View style={{ width: 120, alignItems: 'center' }}>
+                  <View style={{ width: 140, alignItems: 'center' }}>
                     <Text style={{ color: '#555', fontWeight: 'bold' }}>{row.totalItemTypes} Macam</Text>
                     <Text style={{ color: '#888', fontSize: 12 }}>({row.totalJumlah} Unit)</Text>
                   </View>
 
-                  <Text style={{ width: 120, paddingHorizontal: 10, color: '#555', fontSize: 12 }} numberOfLines={2}>
+                  <Text style={{ flex: 2, minWidth: 180, paddingHorizontal: 10, color: '#555', fontSize: 12 }} numberOfLines={2}>
                     {row.keteranganGabungan.length > 0 ? row.keteranganGabungan.join(', ') : '-'}
                   </Text>
                   
-                  <View style={{ width: 90, flexDirection: 'row', justifyContent: 'center', gap: 10 }}>
-                    {/* Tombol Detail */}
-                    <TouchableOpacity onPress={() => { setItemDetail(row); setModalDetailVisible(true); }}>
-                      <Ionicons name="eye-outline" size={22} color="#17a2b8" />
+                  {/* Kolom Aksi dengan Tombol Detail, Edit, dan Hapus */}
+                  <View style={{ width: 120, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+                    <TouchableOpacity style={[styles.iconButton, { backgroundColor: '#17a2b8' }]} onPress={() => { setItemDetail(row); setModalDetailVisible(true); }}>
+                      <Ionicons name="eye-outline" size={16} color="#FFF" />
                     </TouchableOpacity>
-                    {/* Tombol Hapus Dokumen */}
-                    <TouchableOpacity onPress={() => handleBukaHapusDb(row)}>
-                      <Ionicons name="trash-outline" size={22} color="#d9534f" />
+                    <TouchableOpacity style={[styles.iconButton, { backgroundColor: '#ffc107' }]} onPress={() => handleBukaEdit(row)}>
+                      <Ionicons name="pencil-outline" size={16} color="#333" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.iconButton, { backgroundColor: '#d9534f' }]} onPress={() => handleBukaHapusDb(row)}>
+                      <Ionicons name="trash-outline" size={16} color="#FFF" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -755,9 +776,8 @@ const BarangMasukScreen = () => {
         )}
       </View>
 
-      {/* --- MODAL PENCARIAN (Tetap Sama) --- */}
+      {/* --- MODAL PENCARIAN --- */}
       <Modal visible={modalSearchVisible} animationType="slide" transparent={true} onRequestClose={() => setModalSearchVisible(false)}>
-        {/* ... Konten Modal Pencarian ... */}
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { height: '80%' }]}>
             <Text style={styles.title}>Cari Barang</Text>
@@ -765,14 +785,11 @@ const BarangMasukScreen = () => {
               <Ionicons name="search" size={20} color="#888" style={{ marginRight: 10 }} />
               <TextInput style={styles.searchInput} placeholder="Ketik nama atau kode..." value={searchText} onChangeText={setSearchText} autoFocus={true} />
             </View>
-            <FlatList 
-              data={filteredMaster} keyExtractor={(item) => item.id}
-              renderItem={({item}) => (
-                <TouchableOpacity style={styles.searchListItem} onPress={() => handlePilihBarang(item)}>
-                  <Text style={styles.searchListCode}>[{item.kode}]</Text><Text style={styles.searchListName}>{item.nama}</Text>
-                </TouchableOpacity>
-              )}
-            />
+            <FlatList data={filteredMaster} keyExtractor={(item) => item.id} renderItem={({item}) => (
+              <TouchableOpacity style={styles.searchListItem} onPress={() => handlePilihBarang(item)}>
+                <Text style={styles.searchListCode}>[{item.kode}]</Text><Text style={styles.searchListName}>{item.nama}</Text>
+              </TouchableOpacity>
+            )}/>
             <TouchableOpacity style={[styles.button, { backgroundColor: '#d9534f', marginTop: 15 }]} onPress={() => setModalSearchVisible(false)}>
               <Text style={styles.buttonText}>Tutup</Text>
             </TouchableOpacity>
@@ -780,21 +797,21 @@ const BarangMasukScreen = () => {
         </View>
       </Modal>
 
-      {/* --- MODAL KONFIRMASI HAPUS KERANJANG (Tetap Sama) --- */}
+      {/* --- MODAL KONFIRMASI HAPUS KERANJANG --- */}
       <Modal animationType="fade" transparent={true} visible={modalHapusVisible} onRequestClose={() => setModalHapusVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={[styles.title, { color: '#d9534f' }]}>Konfirmasi Hapus</Text>
             <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center', color: '#333' }}>Hapus dari daftar masuk?</Text>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5 }]} onPress={() => setModalHapusVisible(false)}><Text style={styles.actionButtonText}>Batal</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1, marginLeft: 5 }]} onPress={eksekusiHapusKeranjang}><Text style={[styles.actionButtonText, { color: '#FFF' }]}>Hapus</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} onPress={() => setModalHapusVisible(false)}><Text style={styles.actionButtonText}>Batal</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1, marginLeft: 5, padding: 12 }]} onPress={eksekusiHapusKeranjang}><Text style={[styles.actionButtonText, { color: '#FFF' }]}>Hapus</Text></TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* --- MODAL DETAIL (Disesuaikan untuk List Barang) --- */}
+      {/* --- MODAL DETAIL --- */}
       <Modal visible={modalDetailVisible} animationType="slide" transparent={true} onRequestClose={() => setModalDetailVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: '80%' }]}>
@@ -820,20 +837,41 @@ const BarangMasukScreen = () => {
         </View>
       </Modal>
 
-      {/* --- MODAL KONFIRMASI HAPUS DARI DATABASE (Disesuaikan) --- */}
+      {/* --- MODAL EDIT DOKUMEN --- */}
+      <Modal visible={modalEditVisible} animationType="slide" transparent={true} onRequestClose={() => setModalEditVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.title}>Edit Dokumen</Text>
+            <Text style={styles.label}>No. Dokumen:</Text>
+            <TextInput style={styles.input} value={editNoDokumen} onChangeText={setEditNoDokumen} />
+            <Text style={styles.label}>Tanggal (YYYY-MM-DD):</Text>
+            <TextInput style={styles.input} value={editTanggal} onChangeText={setEditTanggal} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} onPress={() => setModalEditVisible(false)}>
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#28a745', flex: 1, marginLeft: 5, padding: 12 }]} onPress={handleSimpanEdit}>
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Simpan</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- MODAL KONFIRMASI HAPUS DARI DATABASE --- */}
       <Modal visible={modalHapusDbVisible} animationType="fade" transparent={true} onRequestClose={() => setModalHapusDbVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={[styles.title, { color: '#d9534f' }]}>Hapus Dokumen</Text>
             <Text style={{ fontSize: 15, marginBottom: 20, textAlign: 'center', color: '#333' }}>
-              Yakin ingin menghapus seluruh data pada Dokumen <Text style={{fontWeight: 'bold'}}>{itemHapusDb?.noDokumen}</Text> dari database?
+              Yakin ingin menghapus seluruh data pada Dokumen <Text style={{fontWeight: 'bold'}}>{itemHapusDb?.noDokumen}</Text>?
             </Text>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} onPress={() => setModalHapusDbVisible(false)}>
                 <Text style={styles.actionButtonText}>Batal</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1, marginLeft: 5, padding: 12 }]} onPress={eksekusiHapusDb}>
-                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Ya, Hapus Semua</Text>
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Ya, Hapus</Text>
               </TouchableOpacity>
             </View>
           </View>
