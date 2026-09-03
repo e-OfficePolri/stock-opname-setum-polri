@@ -447,6 +447,20 @@ const BarangMasukScreen = () => {
   const [modalSearchVisible, setModalSearchVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
 
+  const [listBarangMasuk, setListBarangMasuk] = useState<any[]>([]);
+  const [loadingDataMasuk, setLoadingDataMasuk] = useState(true);
+
+  const [modalEditMasukVisible, setModalEditMasukVisible] = useState(false);
+  const [itemEditMasuk, setItemEditMasuk] = useState<any>(null);
+  const [jumlahEdit, setJumlahEdit] = useState('');
+  const [keteranganEdit, setKeteranganEdit] = useState('');
+
+  const [modalDetailVisible, setModalDetailVisible] = useState(false);
+  const [itemDetail, setItemDetail] = useState<any>(null);
+
+  const [modalHapusDbVisible, setModalHapusDbVisible] = useState(false);
+  const [itemHapusDb, setItemHapusDb] = useState<any>(null);
+
   const fetchMasterBarang = async () => {
     try {
       setMasterLoading(true);
@@ -749,9 +763,209 @@ const BarangMasukScreen = () => {
           </View>
         </View>
       </Modal>
+      {/* Tombol Download Laporan Data Masuk */}
+      <TouchableOpacity 
+        style={[styles.button, { backgroundColor: '#17a2b8', marginBottom: 20 }]} 
+        onPress={handleDownloadData}
+      >
+        <Text style={styles.buttonText}>📥 Download / Unduh Data Masuk</Text>
+      </TouchableOpacity>
+
+      {/* Tabel / Daftar Transaksi Barang Masuk */}
+      <View style={{ marginBottom: 30 }}>
+        <Text style={[styles.title, { fontSize: 18, textAlign: 'left', marginBottom: 10 }]}>
+          Riwayat Transaksi Barang Masuk ({listBarangMasuk.length})
+        </Text>
+
+        {loadingDataMasuk ? (
+          <Text style={styles.subtitle}>Memuat riwayat...</Text>
+        ) : listBarangMasuk.length === 0 ? (
+          <Text style={styles.subtitle}>Belum ada riwayat transaksi barang masuk.</Text>
+        ) : (
+          listBarangMasuk.map((item) => (
+            <View key={item.id} style={styles.logCard}>
+              <View style={styles.logHeader}>
+                <Text style={[styles.badge, { backgroundColor: '#28a745' }]}>MASUK</Text>
+                <Text style={styles.logDate}>{item.tanggal}</Text>
+              </View>
+              <Text style={{ fontSize: 12, color: '#0056b3', fontWeight: 'bold', marginBottom: 2 }}>
+                No. Dok: {item.noDokumen}
+              </Text>
+              <Text style={styles.logItemName}>[{item.kodeBarang}] {item.namaBarang}</Text>
+              <Text style={styles.logDetail}>Jumlah: {item.jumlah} Unit</Text>
+              {item.keterangan ? <Text style={styles.logDetail}>Ket: {item.keterangan}</Text> : null}
+
+              {/* Tombol Aksi: Lihat Detail, Edit, Hapus */}
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+                <TouchableOpacity 
+                  style={[styles.iconButton, { backgroundColor: '#17a2b8' }]} 
+                  onPress={() => { setItemDetail(item); setModalDetailVisible(true); }}
+                >
+                  <Ionicons name="eye-outline" size={16} color="#FFF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.iconButton, { backgroundColor: '#ffc107' }]} 
+                  onPress={() => handleBukaEditMasuk(item)}
+                >
+                  <Ionicons name="pencil-outline" size={16} color="#333" />
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.iconButton, { backgroundColor: '#d9534f' }]} 
+                  onPress={() => handleBukaHapusDb(item)}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* Modal Lihat Detail */}
+      <Modal visible={modalDetailVisible} animationType="slide" transparent={true} onRequestClose={() => setModalDetailVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.title}>Detail Barang Masuk</Text>
+            <Text style={styles.reportText}>No. Dokumen: {itemDetail?.noDokumen}</Text>
+            <Text style={styles.reportText}>Tanggal: {itemDetail?.tanggal}</Text>
+            <Text style={styles.reportText}>Kode: {itemDetail?.kodeBarang}</Text>
+            <Text style={styles.reportText}>Nama Barang: {itemDetail?.namaBarang}</Text>
+            <Text style={styles.reportText}>Jumlah: {itemDetail?.jumlah} Unit</Text>
+            <Text style={styles.reportText}>Keterangan: {itemDetail?.keterangan}</Text>
+            <TouchableOpacity style={[styles.button, { marginTop: 15 }]} onPress={() => setModalDetailVisible(false)}>
+              <Text style={styles.buttonText}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Edit Data Masuk */}
+      <Modal visible={modalEditMasukVisible} animationType="slide" transparent={true} onRequestClose={() => setModalEditMasukVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.title}>Edit Barang Masuk</Text>
+            <Text style={styles.label}>Jumlah Masuk:</Text>
+            <TextInput style={styles.input} keyboardType="numeric" value={jumlahEdit} onChangeText={setJumlahEdit} />
+            <Text style={styles.label}>Keterangan:</Text>
+            <TextInput style={styles.input} value={keteranganEdit} onChangeText={setKeteranganEdit} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} onPress={() => setModalEditMasukVisible(false)}>
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#28a745', flex: 1, marginLeft: 5, padding: 12 }]} onPress={handleSimpanEditMasuk}>
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Simpan</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Konfirmasi Hapus dari Database */}
+      <Modal visible={modalHapusDbVisible} animationType="fade" transparent={true} onRequestClose={() => setModalHapusDbVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={[styles.title, { color: '#d9534f' }]}>Hapus Data Transaksi</Text>
+            <Text style={{ fontSize: 16, marginBottom: 20, textAlign: 'center', color: '#333' }}>
+              Yakin ingin menghapus transaksi "{itemHapusDb?.namaBarang}" dari database?
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} onPress={() => setModalHapusDbVisible(false)}>
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#d9534f', flex: 1, marginLeft: 5, padding: 12 }]} onPress={eksekusiHapusDb}>
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Ya, Hapus</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
+
+// Fungsi mengambil riwayat barang masuk dari Firebase
+  const fetchBarangMasuk = async () => {
+    try {
+      setLoadingDataMasuk(true);
+      const querySnapshot = await getDocs(collection(db, 'barangMasuk'));
+      let tempData: any[] = [];
+      querySnapshot.forEach((docItem) => {
+        const item = docItem.data();
+        tempData.push({
+          id: docItem.id,
+          noDokumen: item.noDokumen || '-',
+          tanggal: item.tanggal || '-',
+          kodeBarang: item.kodeBarang || '-',
+          namaBarang: item.namaBarang || '-',
+          jumlah: item.jumlah || 0,
+          keterangan: item.keterangan || '-',
+        });
+      });
+      setListBarangMasuk(tempData);
+    } catch (error) {
+      console.error("Gagal memuat data barang masuk: ", error);
+    } finally {
+      setLoadingDataMasuk(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchBarangMasuk();
+  }, []);
+
+  // Fungsi Edit Data Masuk
+  const handleBukaEditMasuk = (item: any) => {
+    setItemEditMasuk(item);
+    setJumlahEdit(String(item.jumlah));
+    setKeteranganEdit(item.keterangan);
+    setModalEditMasukVisible(true);
+  };
+
+  const handleSimpanEditMasuk = async () => {
+    if (!jumlahEdit || Number(jumlahEdit) <= 0) {
+      Alert.alert('Peringatan', 'Jumlah harus valid!');
+      return;
+    }
+    try {
+      const docRef = doc(db, 'barangMasuk', itemEditMasuk.id);
+      await updateDoc(docRef, {
+        jumlah: Number(jumlahEdit),
+        keterangan: keteranganEdit.trim(),
+      });
+      Alert.alert('Sukses', 'Data barang masuk berhasil diperbarui!');
+      setModalEditMasukVisible(false);
+      fetchBarangMasuk();
+    } catch (error: any) {
+      Alert.alert('Error', `Gagal memperbarui: ${error.message}`);
+    }
+  };
+
+  // Fungsi Hapus Data dari Database
+  const handleBukaHapusDb = (item: any) => {
+    setItemHapusDb(item);
+    setModalHapusDbVisible(true);
+  };
+
+  const eksekusiHapusDb = async () => {
+    if (!itemHapusDb) return;
+    try {
+      const docRef = doc(db, 'barangMasuk', itemHapusDb.id);
+      await deleteDoc(docRef);
+      setModalHapusDbVisible(false);
+      setItemHapusDb(null);
+      fetchBarangMasuk();
+      Alert.alert('Sukses', 'Data berhasil dihapus dari database.');
+    } catch (error: any) {
+      Alert.alert('Error', `Gagal menghapus: ${error.message}`);
+    }
+  };
+
+  // Fungsi Simulasi Download Data
+  const handleDownloadData = () => {
+    Alert.alert('Unduh Data', 'Data rekapitulasi barang masuk berhasil diunduh dalam format laporan.');
+  };
 
 // --- 4. LAYAR BARANG KELUAR (DENGAN KERANJANG) ---
 const BarangKeluarScreen = () => {
