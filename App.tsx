@@ -926,33 +926,80 @@ const BarangMasukScreen = () => {
       {/* --- MODAL EDIT DOKUMEN & KELOLA BARANG --- */}
       <Modal visible={modalEditVisible} animationType="slide" transparent={true} onRequestClose={() => setModalEditVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { width: '90%', maxHeight: '85%' }]}>
+          <View style={[styles.modalContent, { width: '90%', maxHeight: '85%', padding: 20 }]}>
             <Text style={styles.title}>Edit Dokumen & Barang</Text>
             
             <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%' }}>
-              {/* Form edit dokumen dan daftar item... */}
+              <Text style={styles.label}>No. Dokumen:</Text>
+              <TextInput style={styles.input} value={editNoDokumen} onChangeText={setEditNoDokumen} />
+              
+              <Text style={styles.label}>Tanggal (YYYY-MM-DD):</Text>
+              <TextInput style={styles.input} value={editTanggal} onChangeText={setEditTanggal} />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 5 }}>
+                <Text style={[styles.label, { color: '#0056b3', marginBottom: 0 }]}>Daftar Item Barang:</Text>
+                <TouchableOpacity style={{ backgroundColor: '#28a745', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 5 }} onPress={() => setModalSearchEditVisible(true)}>
+                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>+ Tambah Barang</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {editItemsList.map((item, index) => (
+                <View key={index} style={{ backgroundColor: '#f8f9fa', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#ddd' }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <Text style={{ fontWeight: 'bold', color: '#333' }}>[{item.kodeBarang}] {item.namaBarang}</Text>
+                    <TouchableOpacity onPress={() => handleHapusItemDariEdit(index)}>
+                      <Ionicons name="trash-outline" size={18} color="#d9534f" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <Text style={styles.label}>Jumlah:</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    keyboardType="numeric" 
+                    value={String(item.jumlah)} 
+                    onChangeText={(val) => handleUbahItemEdit(index, 'jumlah', val)} 
+                  />
+
+                  <Text style={styles.label}>Keterangan:</Text>
+                  <TextInput 
+                    style={styles.input} 
+                    value={item.keterangan} 
+                    onChangeText={(val) => handleUbahItemEdit(index, 'keterangan', val)} 
+                  />
+                </View>
+              ))}
             </ScrollView>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 15, width: '100%' }}>
-              {/* Tombol aksi batal & simpan... */}
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ccc', flex: 1, marginRight: 5, padding: 12 }]} onPress={() => setModalEditVisible(false)}>
+                <Text style={styles.actionButtonText}>Batal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#28a745', flex: 1, marginLeft: 5, padding: 12 }]} onPress={handleSimpanEdit}>
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>Simpan Perubahan</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* --- MODAL PENCARIAN TAMBAH BARANG DI EDIT (HARUS DI DALAM SINI) --- */}
+        {/* --- MODAL PENCARIAN TAMBAH BARANG DI EDIT --- */}
         <Modal visible={modalSearchEditVisible} animationType="slide" transparent={true} onRequestClose={() => setModalSearchEditVisible(false)}>
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { height: '80%' }]}>
+            <View style={[styles.modalContent, { width: '85%', height: '75%', padding: 20 }]}>
               <Text style={styles.title}>Pilih Barang Tambahan</Text>
               <View style={styles.searchBarContainer}>
                 <Ionicons name="search" size={20} color="#888" style={{ marginRight: 10 }} />
                 <TextInput style={styles.searchInput} placeholder="Cari master barang..." value={searchEditText} onChangeText={setSearchEditText} autoFocus={true} />
               </View>
-              <FlatList data={filteredMasterEdit} keyExtractor={(item) => item.id} renderItem={({item}) => (
-                <TouchableOpacity style={styles.searchListItem} onPress={() => handleTambahItemBaruDiEdit(item)}>
-                  <Text style={styles.searchListCode}>[{item.kode}]</Text><Text style={styles.searchListName}>{item.nama}</Text>
-                </TouchableOpacity>
-              )}/>
+              <FlatList 
+                data={filteredMasterEdit} 
+                keyExtractor={(item) => item.id} 
+                renderItem={({item}) => (
+                  <TouchableOpacity style={styles.searchListItem} onPress={() => handleTambahItemBaruDiEdit(item)}>
+                    <Text style={styles.searchListCode}>[{item.kode}]</Text>
+                    <Text style={styles.searchListName}>{item.nama}</Text>
+                  </TouchableOpacity>
+                )}
+              />
               <TouchableOpacity style={[styles.button, { backgroundColor: '#d9534f', marginTop: 15 }]} onPress={() => setModalSearchEditVisible(false)}>
                 <Text style={styles.buttonText}>Batal</Text>
               </TouchableOpacity>
